@@ -17,7 +17,7 @@ html,body{
   width:100%;
   height:100%;
   overflow:hidden;
-  background:#000814;
+  background:#020817;
   font-family:Arial, Helvetica, sans-serif;
 }
 
@@ -26,23 +26,22 @@ canvas{
   height:100vh;
   display:block;
   background:
-    radial-gradient(circle at top,#061427 0%,#020611 45%,#00040b 100%);
+  radial-gradient(circle at top,#07172d 0%,#020817 45%,#00040b 100%);
 }
 
 .hint{
   position:fixed;
-  bottom:20px;
   left:50%;
+  bottom:20px;
   transform:translateX(-50%);
   color:rgba(255,255,255,.7);
   font-size:14px;
-  padding:10px 16px;
+  padding:12px 18px;
   border-radius:999px;
-  background:rgba(0,0,0,.3);
+  background:rgba(0,0,0,.28);
   backdrop-filter:blur(10px);
   border:1px solid rgba(255,255,255,.08);
   z-index:10;
-  user-select:none;
 }
 </style>
 </head>
@@ -63,12 +62,9 @@ function resize(){
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 }
-
 resize();
-window.addEventListener("resize", resize);
 
-const W = () => canvas.width;
-const H = () => canvas.height;
+window.addEventListener("resize", resize);
 
 const TAU = Math.PI * 2;
 
@@ -77,26 +73,29 @@ img.src = "portrait.png";
 
 let bgStars = [];
 let portraitStars = [];
+let flyingStars = [];
+
+let formationFinished = false;
 
 function rand(min,max){
-  return Math.random() * (max - min) + min;
+  return Math.random()*(max-min)+min;
 }
 
 function drawStar(x,y,r,a=1){
 
   const g = ctx.createRadialGradient(
     x,y,0,
-    x,y,r*6
+    x,y,r*5
   );
 
   g.addColorStop(0,`rgba(255,255,255,${a})`);
-  g.addColorStop(0.2,`rgba(220,235,255,${a*0.9})`);
-  g.addColorStop(0.5,`rgba(120,180,255,${a*0.25})`);
-  g.addColorStop(1,`rgba(120,180,255,0)`);
+  g.addColorStop(0.2,`rgba(220,235,255,${a*.9})`);
+  g.addColorStop(0.5,`rgba(130,180,255,${a*.25})`);
+  g.addColorStop(1,`rgba(130,180,255,0)`);
 
   ctx.beginPath();
   ctx.fillStyle = g;
-  ctx.arc(x,y,r*6,0,TAU);
+  ctx.arc(x,y,r*5,0,TAU);
   ctx.fill();
 
   ctx.beginPath();
@@ -105,7 +104,7 @@ function drawStar(x,y,r,a=1){
   ctx.fill();
 }
 
-function drawLine(a,b,alpha=.16){
+function drawLine(a,b,alpha=.22){
 
   ctx.beginPath();
 
@@ -122,18 +121,18 @@ function createBackgroundStars(){
 
   bgStars = [];
 
-  for(let i=0;i<700;i++){
+  for(let i=0;i<500;i++){
 
     bgStars.push({
 
-      x:rand(0,W()),
-      y:rand(0,H()),
+      x:rand(0,canvas.width),
+      y:rand(0,canvas.height),
 
-      r:rand(.4,2.2),
+      r:rand(.3,1.8),
 
-      a:rand(.15,1),
+      a:rand(.2,1),
 
-      pulse:rand(0,TAU)
+      glow:rand(0,TAU)
     });
   }
 }
@@ -143,39 +142,37 @@ function buildPortrait(){
   const off = document.createElement("canvas");
   const octx = off.getContext("2d");
 
-  off.width = W();
-  off.height = H();
+  off.width = canvas.width;
+  off.height = canvas.height;
 
   const scale = Math.min(
-    W()/img.width,
-    H()/img.height
+    canvas.width / img.width,
+    canvas.height / img.height
   ) * 0.9;
 
   const iw = img.width * scale;
   const ih = img.height * scale;
 
-  const ix = (W()-iw)/2;
-  const iy = (H()-ih)/2;
+  const ix = (canvas.width - iw)/2;
+  const iy = (canvas.height - ih)/2;
 
-  octx.drawImage(
-    img,
-    ix,
-    iy,
-    iw,
-    ih
-  );
+  octx.drawImage(img,ix,iy,iw,ih);
 
   const data = octx.getImageData(
-    0,0,W(),H()
+    0,0,
+    canvas.width,
+    canvas.height
   ).data;
 
   portraitStars = [];
+  flyingStars = [];
 
-  for(let y=0;y<H();y+=2){
+  // MENOS ESTRELAS
+  for(let y=0;y<canvas.height;y+=5){
 
-    for(let x=0;x<W();x+=2){
+    for(let x=0;x<canvas.width;x+=5){
 
-      const i = (y * W() + x) * 4;
+      const i = (y * canvas.width + x) * 4;
 
       const r = data[i];
       const g = data[i+1];
@@ -183,28 +180,48 @@ function buildPortrait(){
 
       const bright = (r+g+b)/3;
 
-      // DETECTA PARTES CLARAS DA IMAGEM
-      if(bright > 40){
+      if(bright > 60){
 
-        // densidade
-        if(Math.random() > 0.42) continue;
+        // REDUZ MUITO A QUANTIDADE
+        if(Math.random() > 0.18) continue;
 
-        portraitStars.push({
+        const star = {
 
           tx:x,
           ty:y,
 
-          x:rand(-300,W()+300),
-          y:rand(-300,H()+300),
+          x:rand(-300,canvas.width+300),
+          y:rand(-300,canvas.height+300),
 
-          r:rand(.7,2.5),
+          r:rand(.8,2.2),
 
-          progress:0,
+          delay:rand(0,180),
 
-          delay:rand(0,220),
+          formed:false,
 
           glow:rand(0,TAU)
-        });
+        };
+
+        portraitStars.push(star);
+
+        // estrelas extras temporárias
+        for(let k=0;k<2;k++){
+
+          flyingStars.push({
+
+            x:rand(0,canvas.width),
+            y:rand(0,canvas.height),
+
+            tx:x,
+            ty:y,
+
+            life:rand(100,220),
+
+            speed:rand(.01,.03),
+
+            r:rand(.4,1.5)
+          });
+        }
       }
     }
   }
@@ -216,7 +233,7 @@ function connectStars(stars){
 
     const a = stars[i];
 
-    let near = [];
+    let nearest = [];
 
     for(let j=i+1;j<stars.length;j++){
 
@@ -227,17 +244,18 @@ function connectStars(stars){
 
       const d = Math.hypot(dx,dy);
 
-      if(d < 32){
+      // MAIS LINHAS
+      if(d < 45){
 
-        near.push({b,d});
+        nearest.push({b,d});
       }
     }
 
-    near.sort((m,n)=>m.d-n.d);
+    nearest.sort((m,n)=>m.d-n.d);
 
-    near.slice(0,2).forEach(n=>{
+    nearest.slice(0,3).forEach(n=>{
 
-      drawLine(a,n.b,.17);
+      drawLine(a,n.b,.18);
 
     });
   }
@@ -245,69 +263,106 @@ function connectStars(stars){
 
 function render(){
 
-  ctx.clearRect(0,0,W(),H());
+  ctx.clearRect(
+    0,0,
+    canvas.width,
+    canvas.height
+  );
 
   // fundo
   const bg = ctx.createLinearGradient(
-    0,0,0,H()
+    0,0,0,
+    canvas.height
   );
 
-  bg.addColorStop(0,"#020817");
-  bg.addColorStop(1,"#00040c");
+  bg.addColorStop(0,"#041022");
+  bg.addColorStop(1,"#00040b");
 
   ctx.fillStyle = bg;
-  ctx.fillRect(0,0,W(),H());
-
-  // nebulosa leve
-  const neb = ctx.createRadialGradient(
-    W()/2,
-    H()/2,
-    0,
-    W()/2,
-    H()/2,
-    W()/1.2
+  ctx.fillRect(
+    0,0,
+    canvas.width,
+    canvas.height
   );
 
-  neb.addColorStop(0,"rgba(60,90,180,.08)");
+  // nebulosa
+  const neb = ctx.createRadialGradient(
+    canvas.width/2,
+    canvas.height/2,
+    0,
+    canvas.width/2,
+    canvas.height/2,
+    canvas.width
+  );
+
+  neb.addColorStop(0,"rgba(70,110,220,.08)");
   neb.addColorStop(1,"rgba(0,0,0,0)");
 
   ctx.fillStyle = neb;
-  ctx.fillRect(0,0,W(),H());
+  ctx.fillRect(
+    0,0,
+    canvas.width,
+    canvas.height
+  );
 
-  // estrelas fundo
+  // fundo estrelas
   for(const s of bgStars){
 
     const pulse =
-      .7 +
-      Math.sin(Date.now()*0.001 + s.pulse)*.3;
+      .8 +
+      Math.sin(Date.now()*0.001 + s.glow)*.2;
 
     drawStar(
       s.x,
       s.y,
-      s.r * pulse,
+      s.r*pulse,
       s.a
     );
   }
 
-  let visible = [];
+  // ESTRELAS VOANDO
+  for(let i=flyingStars.length-1;i>=0;i--){
 
-  // estrelas retrato
+    const s = flyingStars[i];
+
+    s.x += (s.tx - s.x) * s.speed;
+    s.y += (s.ty - s.y) * s.speed;
+
+    s.life--;
+
+    drawStar(
+      s.x,
+      s.y,
+      s.r,
+      .8
+    );
+
+    if(s.life <= 0){
+
+      flyingStars.splice(i,1);
+    }
+  }
+
+  const visible = [];
+
+  // RETRATO
   for(const s of portraitStars){
 
     if(s.delay > 0){
+
       s.delay--;
       continue;
     }
 
-    s.progress += 0.01;
+    s.x += (s.tx - s.x) * 0.025;
+    s.y += (s.ty - s.y) * 0.025;
 
-    if(s.progress > 1){
-      s.progress = 1;
+    if(
+      Math.abs(s.x - s.tx) < .5 &&
+      Math.abs(s.y - s.ty) < .5
+    ){
+      s.formed = true;
     }
-
-    // MOVIMENTO SUAVE
-    s.x += (s.tx - s.x) * 0.035;
-    s.y += (s.ty - s.y) * 0.035;
 
     visible.push(s);
 
@@ -323,11 +378,8 @@ function render(){
     );
   }
 
-  // linhas
-  if(visible.length > 50){
-
-    connectStars(visible);
-  }
+  // LINHAS PRINCIPAIS
+  connectStars(visible);
 
   requestAnimationFrame(render);
 }
