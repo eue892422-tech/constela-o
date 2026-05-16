@@ -16,282 +16,205 @@
 
 body{
   overflow:hidden;
-  background:black;
-  font-family:Arial,sans-serif;
+  background:#000;
 }
 
 canvas{
   display:block;
-}
-
-.overlay{
   position:fixed;
   inset:0;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  flex-direction:column;
-  pointer-events:none;
-  z-index:10;
-}
-
-.title{
-  color:white;
-  font-size:4rem;
-  letter-spacing:8px;
-  text-shadow:
-    0 0 10px white,
-    0 0 25px white,
-    0 0 60px #7aa6ff;
-  opacity:0;
-  animation:fadeIn 3s ease forwards;
-}
-
-.sub{
-  color:#ddd;
-  margin-top:20px;
-  font-size:1.2rem;
-  opacity:0;
-  animation:fadeIn 3s ease forwards;
-  animation-delay:2s;
-  text-shadow:0 0 15px white;
-}
-
-@keyframes fadeIn{
-  to{
-    opacity:1;
-  }
 }
 
 </style>
 </head>
 <body>
 
-<div class="overlay">
-  <div class="title">ELOÁ</div>
-  <div class="sub">
-    bilhões de estrelas... mas nenhuma brilha como você
-  </div>
-</div>
+<canvas id="canvas"></canvas>
 
-<script type="module">
+<script>
 
 /*
 ========================================
-THREE JS
+CONFIG
 ========================================
 */
 
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.161/build/three.module.js";
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
-import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.161/examples/jsm/controls/OrbitControls.js";
+canvas.width = innerWidth;
+canvas.height = innerHeight;
 
-import { EffectComposer } from "https://cdn.jsdelivr.net/npm/three@0.161/examples/jsm/postprocessing/EffectComposer.js";
+const particles = [];
+const stars = [];
 
-import { RenderPass } from "https://cdn.jsdelivr.net/npm/three@0.161/examples/jsm/postprocessing/RenderPass.js";
-
-import { UnrealBloomPass } from "https://cdn.jsdelivr.net/npm/three@0.161/examples/jsm/postprocessing/UnrealBloomPass.js";
+let faceReady = false;
 
 /*
 ========================================
-CENA
+FUNDO ESTRELADO
 ========================================
 */
 
-const scene = new THREE.Scene();
+for(let i=0;i<450;i++){
 
-scene.fog = new THREE.FogExp2(0x000000,0.0009);
+  stars.push({
 
-const camera = new THREE.PerspectiveCamera(
-  60,
-  window.innerWidth/window.innerHeight,
-  0.1,
-  2000
-);
+    x:Math.random()*canvas.width,
+    y:Math.random()*canvas.height,
+    z:Math.random()*2,
+    size:Math.random()*2,
+    speed:Math.random()*0.3
 
-camera.position.z = 220;
-
-const renderer = new THREE.WebGLRenderer({
-  antialias:true
-});
-
-renderer.setSize(
-  window.innerWidth,
-  window.innerHeight
-);
-
-renderer.setPixelRatio(devicePixelRatio);
-
-document.body.appendChild(renderer.domElement);
-
-/*
-========================================
-BLOOM CINEMATOGRÁFICO
-========================================
-*/
-
-const composer = new EffectComposer(renderer);
-
-composer.addPass(
-  new RenderPass(scene,camera)
-);
-
-const bloomPass = new UnrealBloomPass(
-  new THREE.Vector2(
-    window.innerWidth,
-    window.innerHeight
-  ),
-  1.8,
-  0.4,
-  0.85
-);
-
-composer.addPass(bloomPass);
-
-/*
-========================================
-ESTRELAS DE FUNDO
-========================================
-*/
-
-const bgGeometry = new THREE.BufferGeometry();
-
-const bgCount = 5000;
-
-const bgPositions = [];
-
-for(let i=0;i<bgCount;i++){
-
-  bgPositions.push(
-    (Math.random()-0.5)*3000,
-    (Math.random()-0.5)*3000,
-    (Math.random()-0.5)*3000
-  );
+  });
 
 }
 
-bgGeometry.setAttribute(
-  "position",
-  new THREE.Float32BufferAttribute(
-    bgPositions,
-    3
-  )
-);
-
-const bgMaterial = new THREE.PointsMaterial({
-  color:0xffffff,
-  size:1.3,
-  transparent:true,
-  opacity:0.9
-});
-
-const backgroundStars = new THREE.Points(
-  bgGeometry,
-  bgMaterial
-);
-
-scene.add(backgroundStars);
-
 /*
 ========================================
-NEBULOSA
+PARTÍCULA
 ========================================
 */
 
-const nebulaGeometry = new THREE.BufferGeometry();
+class Particle{
 
-const nebulaPositions = [];
+  constructor(startX,startY,targetX,targetY,color){
 
-for(let i=0;i<2000;i++){
+    this.x = startX;
+    this.y = startY;
 
-  nebulaPositions.push(
-    (Math.random()-0.5)*1000,
-    (Math.random()-0.5)*1000,
-    (Math.random()-0.5)*1000
-  );
+    this.tx = targetX;
+    this.ty = targetY;
+
+    this.color = color;
+
+    this.size =
+      Math.random()*1.5 + 0.3;
+
+    this.vx = 0;
+    this.vy = 0;
+
+    this.alpha = 0;
+
+  }
+
+  update(){
+
+    let dx = this.tx - this.x;
+    let dy = this.ty - this.y;
+
+    this.vx += dx * 0.010;
+    this.vy += dy * 0.010;
+
+    this.vx *= 0.88;
+    this.vy *= 0.88;
+
+    this.x += this.vx;
+    this.y += this.vy;
+
+    if(this.alpha < 1){
+      this.alpha += 0.015;
+    }
+
+  }
+
+  draw(){
+
+    ctx.beginPath();
+
+    ctx.arc(
+      this.x,
+      this.y,
+      this.size,
+      0,
+      Math.PI*2
+    );
+
+    ctx.fillStyle = `
+      rgba(
+        ${this.color.r},
+        ${this.color.g},
+        ${this.color.b},
+        ${this.alpha}
+      )
+    `;
+
+    ctx.shadowBlur = 12;
+
+    ctx.shadowColor = `
+      rgba(
+        ${this.color.r},
+        ${this.color.g},
+        ${this.color.b},
+        1
+      )
+    `;
+
+    ctx.fill();
+
+  }
 
 }
 
-nebulaGeometry.setAttribute(
-  "position",
-  new THREE.Float32BufferAttribute(
-    nebulaPositions,
-    3
-  )
-);
-
-const nebulaMaterial = new THREE.PointsMaterial({
-  color:0x7aa6ff,
-  size:3,
-  transparent:true,
-  opacity:0.05
-});
-
-const nebula = new THREE.Points(
-  nebulaGeometry,
-  nebulaMaterial
-);
-
-scene.add(nebula);
-
 /*
 ========================================
-IMAGEM
+CARREGAR FOTO
 ========================================
 */
 
-const img = new Image();
+const image = new Image();
 
 /*
 ========================================
-MUDE O NOME DA FOTO AQUI
+NOME DA FOTO
 ========================================
 */
 
-img.src = "foto.jpg";
+image.src = "foto.jpg";
 
-let faceParticles;
+image.onload = () => {
 
-/*
-========================================
-CRIAR ROSTO
-========================================
-*/
+  const off = document.createElement("canvas");
+  const offCtx = off.getContext("2d");
 
-img.onload = () => {
-
-  const tempCanvas = document.createElement("canvas");
-  const ctx = tempCanvas.getContext("2d");
+  /*
+  ========================================
+  ESCALA
+  ========================================
+  */
 
   const scale = 0.45;
 
-  tempCanvas.width = img.width * scale;
-  tempCanvas.height = img.height * scale;
+  off.width = image.width * scale;
+  off.height = image.height * scale;
 
-  ctx.drawImage(
-    img,
+  offCtx.drawImage(
+    image,
     0,
     0,
-    tempCanvas.width,
-    tempCanvas.height
+    off.width,
+    off.height
   );
 
-  const data = ctx.getImageData(
+  const data = offCtx.getImageData(
     0,
     0,
-    tempCanvas.width,
-    tempCanvas.height
+    off.width,
+    off.height
   ).data;
 
-  const positions = [];
-  const colors = [];
+  /*
+  ========================================
+  MENOS PARTÍCULAS = MAIS LEVE
+  ========================================
+  */
 
-  for(let y=0;y<tempCanvas.height;y+=2){
+  for(let y=0;y<off.height;y+=3){
 
-    for(let x=0;x<tempCanvas.width;x+=2){
+    for(let x=0;x<off.width;x+=3){
 
       const index =
-        (y*tempCanvas.width+x)*4;
+        (y*off.width + x)*4;
 
       const r = data[index];
       const g = data[index+1];
@@ -301,35 +224,73 @@ img.onload = () => {
       const brightness =
         (r+g+b)/3;
 
+      /*
+      ========================================
+      PEGAR SOMENTE PARTES VISÍVEIS
+      ========================================
+      */
+
       if(a > 120 && brightness > 35){
 
-        const px =
-          x - tempCanvas.width/2;
+        const tx =
+          x +
+          canvas.width/2 -
+          off.width/2;
 
-        const py =
-          -y + tempCanvas.height/2;
+        const ty =
+          y +
+          canvas.height/2 -
+          off.height/2;
 
-        const pz =
-          (Math.random()-0.5)*25;
+        /*
+        ========================================
+        ESTRELAS VINDO DAS BORDAS
+        ========================================
+        */
 
-        positions.push(
+        let startX;
+        let startY;
 
-          (Math.random()-0.5)*2000,
-          (Math.random()-0.5)*2000,
-          (Math.random()-0.5)*2000
-
+        const side = Math.floor(
+          Math.random()*4
         );
 
-        colors.push(
-          r/255,
-          g/255,
-          b/255
-        );
+        if(side === 0){
 
-        positions.push(
-          px*1.8,
-          py*1.8,
-          pz
+          startX = Math.random()*canvas.width;
+          startY = -100;
+
+        }else if(side === 1){
+
+          startX = canvas.width+100;
+          startY = Math.random()*canvas.height;
+
+        }else if(side === 2){
+
+          startX = Math.random()*canvas.width;
+          startY = canvas.height+100;
+
+        }else{
+
+          startX = -100;
+          startY = Math.random()*canvas.height;
+
+        }
+
+        particles.push(
+
+          new Particle(
+
+            startX,
+            startY,
+
+            tx,
+            ty,
+
+            {r,g,b}
+
+          )
+
         );
 
       }
@@ -338,80 +299,102 @@ img.onload = () => {
 
   }
 
-  const geometry = new THREE.BufferGeometry();
-
-  geometry.setAttribute(
-    "position",
-    new THREE.Float32BufferAttribute(
-      positions,
-      3
-    )
-  );
-
-  geometry.setAttribute(
-    "color",
-    new THREE.Float32BufferAttribute(
-      colors,
-      3
-    )
-  );
-
-  const material = new THREE.PointsMaterial({
-
-    size:1.7,
-    vertexColors:true,
-    transparent:true,
-    opacity:1,
-    blending:THREE.AdditiveBlending
-
-  });
-
-  faceParticles = new THREE.Points(
-    geometry,
-    material
-  );
-
-  scene.add(faceParticles);
+  faceReady = true;
 
 };
 
 /*
 ========================================
-LUZES
+FUNDO
 ========================================
 */
 
-const light1 = new THREE.PointLight(
-  0xffffff,
-  2
-);
+function drawBackground(){
 
-light1.position.set(200,200,200);
+  for(let s of stars){
 
-scene.add(light1);
+    s.y += s.speed;
 
-const light2 = new THREE.PointLight(
-  0x7aa6ff,
-  5
-);
+    if(s.y > canvas.height){
 
-light2.position.set(-200,-100,100);
+      s.y = -10;
+      s.x = Math.random()*canvas.width;
 
-scene.add(light2);
+    }
+
+    ctx.beginPath();
+
+    ctx.arc(
+      s.x,
+      s.y,
+      s.size,
+      0,
+      Math.PI*2
+    );
+
+    ctx.fillStyle =
+      "rgba(255,255,255,0.8)";
+
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "white";
+
+    ctx.fill();
+
+  }
+
+}
 
 /*
 ========================================
-CONTROLES
+LINHAS CONSTELAÇÃO
 ========================================
 */
 
-const controls = new OrbitControls(
-  camera,
-  renderer.domElement
-);
+function connectParticles(){
 
-controls.enableZoom = false;
-controls.enablePan = false;
+  for(let a=0;a<particles.length;a++){
+
+    for(let b=a+1;b<particles.length;b++){
+
+      const dx =
+        particles[a].x -
+        particles[b].x;
+
+      const dy =
+        particles[a].y -
+        particles[b].y;
+
+      const dist =
+        Math.sqrt(dx*dx + dy*dy);
+
+      if(dist < 11){
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+          particles[a].x,
+          particles[a].y
+        );
+
+        ctx.lineTo(
+          particles[b].x,
+          particles[b].y
+        );
+
+        ctx.strokeStyle =
+          "rgba(255,255,255,0.05)";
+
+        ctx.lineWidth = 0.5;
+
+        ctx.stroke();
+
+      }
+
+    }
+
+  }
+
+}
 
 /*
 ========================================
@@ -419,35 +402,31 @@ ANIMAÇÃO
 ========================================
 */
 
-let clock = new THREE.Clock();
-
 function animate(){
 
   requestAnimationFrame(animate);
 
-  const time = clock.getElapsedTime();
+  ctx.clearRect(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
 
-  backgroundStars.rotation.y += 0.0003;
+  drawBackground();
 
-  nebula.rotation.y += 0.0006;
+  if(faceReady){
 
-  if(faceParticles){
+    for(let p of particles){
 
-    faceParticles.rotation.y =
-      Math.sin(time*0.2)*0.08;
+      p.update();
+      p.draw();
 
-    faceParticles.rotation.x =
-      Math.cos(time*0.15)*0.03;
+    }
 
-    faceParticles.material.size =
-      1.5 + Math.sin(time*2)*0.2;
+    connectParticles();
 
   }
-
-  camera.position.z =
-    220 + Math.sin(time*0.4)*8;
-
-  composer.render();
 
 }
 
@@ -463,21 +442,8 @@ window.addEventListener(
   "resize",
   ()=>{
 
-    camera.aspect =
-      window.innerWidth/
-      window.innerHeight;
-
-    camera.updateProjectionMatrix();
-
-    renderer.setSize(
-      window.innerWidth,
-      window.innerHeight
-    );
-
-    composer.setSize(
-      window.innerWidth,
-      window.innerHeight
-    );
+    canvas.width = innerWidth;
+    canvas.height = innerHeight;
 
   }
 );
