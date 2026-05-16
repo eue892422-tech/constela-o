@@ -1,21 +1,346 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Constelação Viva</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
-  <link rel="stylesheet" href="style.css">
+<title>Constelação Retrato</title>
+
+<style>
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+}
+
+html,body{
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:#000814;
+  font-family:Arial, Helvetica, sans-serif;
+}
+
+canvas{
+  width:100vw;
+  height:100vh;
+  display:block;
+  background:
+    radial-gradient(circle at top,#061427 0%,#020611 45%,#00040b 100%);
+}
+
+.hint{
+  position:fixed;
+  bottom:20px;
+  left:50%;
+  transform:translateX(-50%);
+  color:rgba(255,255,255,.7);
+  font-size:14px;
+  padding:10px 16px;
+  border-radius:999px;
+  background:rgba(0,0,0,.3);
+  backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.08);
+  z-index:10;
+  user-select:none;
+}
+</style>
 </head>
+
 <body>
 
 <canvas id="scene"></canvas>
 
-<div class="title">
-  CONSTELAÇÃO VIVA
+<div class="hint">
+✨ As estrelas estão formando o retrato...
 </div>
 
-<script src="script.js"></script>
+<script>
+const canvas = document.getElementById("scene");
+const ctx = canvas.getContext("2d");
+
+function resize(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+
+resize();
+window.addEventListener("resize", resize);
+
+const W = () => canvas.width;
+const H = () => canvas.height;
+
+const TAU = Math.PI * 2;
+
+const img = new Image();
+img.src = "portrait.png";
+
+let bgStars = [];
+let portraitStars = [];
+
+function rand(min,max){
+  return Math.random() * (max - min) + min;
+}
+
+function drawStar(x,y,r,a=1){
+
+  const g = ctx.createRadialGradient(
+    x,y,0,
+    x,y,r*6
+  );
+
+  g.addColorStop(0,`rgba(255,255,255,${a})`);
+  g.addColorStop(0.2,`rgba(220,235,255,${a*0.9})`);
+  g.addColorStop(0.5,`rgba(120,180,255,${a*0.25})`);
+  g.addColorStop(1,`rgba(120,180,255,0)`);
+
+  ctx.beginPath();
+  ctx.fillStyle = g;
+  ctx.arc(x,y,r*6,0,TAU);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.fillStyle = `rgba(255,255,255,${a})`;
+  ctx.arc(x,y,r,0,TAU);
+  ctx.fill();
+}
+
+function drawLine(a,b,alpha=.16){
+
+  ctx.beginPath();
+
+  ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+  ctx.lineWidth = .7;
+
+  ctx.moveTo(a.x,a.y);
+  ctx.lineTo(b.x,b.y);
+
+  ctx.stroke();
+}
+
+function createBackgroundStars(){
+
+  bgStars = [];
+
+  for(let i=0;i<700;i++){
+
+    bgStars.push({
+
+      x:rand(0,W()),
+      y:rand(0,H()),
+
+      r:rand(.4,2.2),
+
+      a:rand(.15,1),
+
+      pulse:rand(0,TAU)
+    });
+  }
+}
+
+function buildPortrait(){
+
+  const off = document.createElement("canvas");
+  const octx = off.getContext("2d");
+
+  off.width = W();
+  off.height = H();
+
+  const scale = Math.min(
+    W()/img.width,
+    H()/img.height
+  ) * 0.9;
+
+  const iw = img.width * scale;
+  const ih = img.height * scale;
+
+  const ix = (W()-iw)/2;
+  const iy = (H()-ih)/2;
+
+  octx.drawImage(
+    img,
+    ix,
+    iy,
+    iw,
+    ih
+  );
+
+  const data = octx.getImageData(
+    0,0,W(),H()
+  ).data;
+
+  portraitStars = [];
+
+  for(let y=0;y<H();y+=2){
+
+    for(let x=0;x<W();x+=2){
+
+      const i = (y * W() + x) * 4;
+
+      const r = data[i];
+      const g = data[i+1];
+      const b = data[i+2];
+
+      const bright = (r+g+b)/3;
+
+      // DETECTA PARTES CLARAS DA IMAGEM
+      if(bright > 40){
+
+        // densidade
+        if(Math.random() > 0.42) continue;
+
+        portraitStars.push({
+
+          tx:x,
+          ty:y,
+
+          x:rand(-300,W()+300),
+          y:rand(-300,H()+300),
+
+          r:rand(.7,2.5),
+
+          progress:0,
+
+          delay:rand(0,220),
+
+          glow:rand(0,TAU)
+        });
+      }
+    }
+  }
+}
+
+function connectStars(stars){
+
+  for(let i=0;i<stars.length;i++){
+
+    const a = stars[i];
+
+    let near = [];
+
+    for(let j=i+1;j<stars.length;j++){
+
+      const b = stars[j];
+
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+
+      const d = Math.hypot(dx,dy);
+
+      if(d < 32){
+
+        near.push({b,d});
+      }
+    }
+
+    near.sort((m,n)=>m.d-n.d);
+
+    near.slice(0,2).forEach(n=>{
+
+      drawLine(a,n.b,.17);
+
+    });
+  }
+}
+
+function render(){
+
+  ctx.clearRect(0,0,W(),H());
+
+  // fundo
+  const bg = ctx.createLinearGradient(
+    0,0,0,H()
+  );
+
+  bg.addColorStop(0,"#020817");
+  bg.addColorStop(1,"#00040c");
+
+  ctx.fillStyle = bg;
+  ctx.fillRect(0,0,W(),H());
+
+  // nebulosa leve
+  const neb = ctx.createRadialGradient(
+    W()/2,
+    H()/2,
+    0,
+    W()/2,
+    H()/2,
+    W()/1.2
+  );
+
+  neb.addColorStop(0,"rgba(60,90,180,.08)");
+  neb.addColorStop(1,"rgba(0,0,0,0)");
+
+  ctx.fillStyle = neb;
+  ctx.fillRect(0,0,W(),H());
+
+  // estrelas fundo
+  for(const s of bgStars){
+
+    const pulse =
+      .7 +
+      Math.sin(Date.now()*0.001 + s.pulse)*.3;
+
+    drawStar(
+      s.x,
+      s.y,
+      s.r * pulse,
+      s.a
+    );
+  }
+
+  let visible = [];
+
+  // estrelas retrato
+  for(const s of portraitStars){
+
+    if(s.delay > 0){
+      s.delay--;
+      continue;
+    }
+
+    s.progress += 0.01;
+
+    if(s.progress > 1){
+      s.progress = 1;
+    }
+
+    // MOVIMENTO SUAVE
+    s.x += (s.tx - s.x) * 0.035;
+    s.y += (s.ty - s.y) * 0.035;
+
+    visible.push(s);
+
+    const pulse =
+      .9 +
+      Math.sin(Date.now()*0.002 + s.glow)*.15;
+
+    drawStar(
+      s.x,
+      s.y,
+      s.r * pulse,
+      1
+    );
+  }
+
+  // linhas
+  if(visible.length > 50){
+
+    connectStars(visible);
+  }
+
+  requestAnimationFrame(render);
+}
+
+img.onload = ()=>{
+
+  createBackgroundStars();
+
+  buildPortrait();
+
+  render();
+};
+</script>
 
 </body>
 </html>
