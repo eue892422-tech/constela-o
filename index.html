@@ -64,6 +64,8 @@
       padding: 8px 12px;
       border-radius: 999px;
       user-select: none;
+      text-align: center;
+      z-index: 10;
     }
   </style>
 </head>
@@ -71,7 +73,10 @@
   <div class="wrap">
     <canvas id="scene" width="1024" height="768"></canvas>
   </div>
-  <div class="hint">Clique para um novo céu • retrato em constelação procedural</div>
+
+  <div class="hint">
+    Clique para gerar outro céu • aperte S para salvar em PNG
+  </div>
 
   <script>
     const canvas = document.getElementById("scene");
@@ -79,28 +84,18 @@
 
     const W = canvas.width;
     const H = canvas.height;
-    const DPR = Math.max(1, window.devicePixelRatio || 1);
 
-    // =========================================================
-    // CONFIGURAÇÃO GERAL
-    // =========================================================
     const CFG = {
       backgroundStars: 380,
-      mistLayers: 2,
       lineWidth: 1.05,
       lineGlow: 7,
       starMin: 0.7,
       starMax: 2.8,
       portraitStarMin: 1.6,
       portraitStarMax: 3.8,
-      twinkleSpeed: 0.0016,
-      noiseLinksPerPoint: 2,
-      portraitAlpha: 0.95
+      twinkleSpeed: 0.0016
     };
 
-    // =========================================================
-    // UTILITÁRIOS
-    // =========================================================
     const TAU = Math.PI * 2;
 
     function lerp(a, b, t) {
@@ -117,13 +112,6 @@
 
     function mapPoint(p) {
       return { x: p.x * W, y: p.y * H };
-    }
-
-    function jitterPoint(p, amount = 0) {
-      return {
-        x: p.x + rand(-amount, amount),
-        y: p.y + rand(-amount, amount)
-      };
     }
 
     function drawGlowStar(x, y, r, alpha = 1) {
@@ -170,19 +158,24 @@
       const counts = new Array(points.length).fill(0);
 
       for (let i = 0; i < points.length; i++) {
-        let localCandidates = [];
+        const candidates = [];
+
         for (let j = i + 1; j < points.length; j++) {
           const dx = points[i].x - points[j].x;
           const dy = points[i].y - points[j].y;
           const d = Math.hypot(dx, dy);
-          if (d <= maxDist) localCandidates.push({ j, d });
+
+          if (d <= maxDist) {
+            candidates.push({ j, d });
+          }
         }
 
-        localCandidates.sort((a, b) => a.d - b.d);
+        candidates.sort((a, b) => a.d - b.d);
 
-        for (const c of localCandidates) {
+        for (const c of candidates) {
           if (counts[i] >= limitPerPoint) break;
           if (counts[c.j] >= limitPerPoint) continue;
+
           drawLine(points[i], points[c.j], alpha, width);
           counts[i]++;
           counts[c.j]++;
@@ -191,16 +184,22 @@
     }
 
     function mirrorX(points, xCenter) {
-      return points.map(p => ({ x: xCenter + (xCenter - p.x), y: p.y }));
+      return points.map(p => ({
+        x: xCenter + (xCenter - p.x),
+        y: p.y
+      }));
     }
 
     function sampleCurve(points, steps = 0) {
       if (!steps || points.length < 2) return points;
+
       const out = [];
+
       for (let i = 0; i < points.length - 1; i++) {
         const a = points[i];
         const b = points[i + 1];
         out.push(a);
+
         for (let s = 1; s <= steps; s++) {
           out.push({
             x: lerp(a.x, b.x, s / (steps + 1)),
@@ -208,18 +207,14 @@
           });
         }
       }
+
       out.push(points[points.length - 1]);
       return out;
     }
 
-    // =========================================================
-    // PONTOS DO RETRATO
-    // Coordenadas normalizadas em relação a 1024x768
-    // =========================================================
     function buildPortrait() {
       const cx = 0.5;
 
-      // Rosto
       const jawLeft = [
         { x: 0.445, y: 0.585 },
         { x: 0.431, y: 0.610 },
@@ -245,7 +240,6 @@
       ];
       const faceRightSide = mirrorX(faceLeftSide, cx).reverse();
 
-      // Olhos
       const eyeLeftUpper = [
         { x: 0.430, y: 0.335 },
         { x: 0.447, y: 0.323 },
@@ -283,7 +277,6 @@
       const lidRight = mirrorX(lidLeft, cx);
       const browRight = mirrorX(browLeft, cx);
 
-      // Nariz
       const noseBridge = [
         { x: 0.515, y: 0.345 },
         { x: 0.510, y: 0.392 },
@@ -302,7 +295,6 @@
       ];
       const nostrilRight = mirrorX(nostrilLeft, cx);
 
-      // Boca
       const lipUpper = [
         { x: 0.455, y: 0.596 },
         { x: 0.482, y: 0.584 },
@@ -323,7 +315,6 @@
         { x: 0.538, y: 0.602 }
       ];
 
-      // Pescoço
       const neckLeft = [
         { x: 0.470, y: 0.706 },
         { x: 0.456, y: 0.736 },
@@ -331,7 +322,6 @@
       ];
       const neckRight = mirrorX(neckLeft, cx);
 
-      // Colar
       const necklaceArc = [
         { x: 0.444, y: 0.742 },
         { x: 0.465, y: 0.754 },
@@ -352,7 +342,6 @@
         { x: 0.502, y: 0.783 }
       ];
 
-      // Cabelo esquerdo
       const hairL1 = [
         { x: 0.300, y: 0.050 },
         { x: 0.282, y: 0.118 },
@@ -397,7 +386,6 @@
         { x: 0.405, y: 0.535 }
       ];
 
-      // Cabelo direito
       const hairR1 = [
         { x: 0.680, y: 0.052 },
         { x: 0.705, y: 0.120 },
@@ -448,10 +436,8 @@
         { x: 0.385, y: 0.920 },
         { x: 0.372, y: 0.975 }
       ];
-
       const shoulderR = mirrorX(shoulderL, cx);
 
-      // Agrupar tudo
       const paths = [
         jawLeft, chinCurve, jawRight,
         faceLeftSide, faceRightSide,
@@ -468,7 +454,6 @@
 
       const mappedPaths = paths.map(path => sampleCurve(path.map(mapPoint), 1));
 
-      // Pontos extras para conexões naturais no cabelo e rosto
       const anchors = [
         ...mappedPaths.flat(),
         mapPoint({ x: 0.355, y: 0.220 }),
@@ -484,20 +469,20 @@
         mapPoint({ x: 0.555, y: 0.770 })
       ];
 
-      return { paths: mappedPaths, anchors };
+      return {
+        paths: mappedPaths,
+        anchors
+      };
     }
 
-    // =========================================================
-    // FUNDO ESTRELADO
-    // =========================================================
     function createBackgroundStars() {
       const stars = [];
+
       for (let i = 0; i < CFG.backgroundStars; i++) {
         const zoneBias = Math.random();
         let x = rand(0, W);
         let y = rand(0, H);
 
-        // Leve concentração próxima do retrato
         if (zoneBias < 0.42) {
           x = clamp(rand(W * 0.18, W * 0.82), 0, W);
           y = clamp(rand(H * 0.04, H * 0.96), 0, H);
@@ -512,8 +497,111 @@
           speed: rand(0.6, 1.45)
         });
       }
+
       return stars;
     }
 
     function drawBackground(stars, time) {
-      ctx.clearRect(0, 0, W
+      ctx.clearRect(0, 0, W, H);
+
+      const mist1 = ctx.createRadialGradient(
+        W * 0.50, H * 0.28, 0,
+        W * 0.50, H * 0.28, W * 0.45
+      );
+      mist1.addColorStop(0, "rgba(120,140,200,0.06)");
+      mist1.addColorStop(0.5, "rgba(80,110,180,0.035)");
+      mist1.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = mist1;
+      ctx.fillRect(0, 0, W, H);
+
+      const mist2 = ctx.createRadialGradient(
+        W * 0.48, H * 0.56, 0,
+        W * 0.48, H * 0.56, W * 0.55
+      );
+      mist2.addColorStop(0, "rgba(120,160,255,0.025)");
+      mist2.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = mist2;
+      ctx.fillRect(0, 0, W, H);
+
+      for (const s of stars) {
+        const tw = 0.75 + 0.25 * Math.sin(time * CFG.twinkleSpeed * s.speed + s.phase);
+        drawGlowStar(s.x, s.y, s.r * tw, s.a * tw);
+      }
+
+      const subset = stars
+        .filter((_, i) => i % 7 === 0)
+        .map(s => ({ x: s.x, y: s.y }));
+
+      connectNearby(subset, 74, 0.045, 0.45, 1);
+    }
+
+    function drawPortrait(portrait, time) {
+      const { paths, anchors } = portrait;
+
+      for (const path of paths) {
+        drawPolyline(path, false, 0.52, 1.02);
+      }
+
+      connectNearby(anchors, 48, 0.12, 0.60, 2);
+      connectNearby(
+        anchors.filter((_, i) => i % 3 === 0),
+        82,
+        0.075,
+        0.50,
+        1
+      );
+
+      let idx = 0;
+      for (const p of anchors) {
+        const pulse = 0.9 + 0.18 * Math.sin(time * 0.0023 + idx * 0.55);
+        const baseR =
+          idx % 9 === 0
+            ? rand(2.3, CFG.portraitStarMax)
+            : rand(CFG.portraitStarMin, 2.7);
+
+        drawGlowStar(p.x, p.y, baseR * pulse, 0.95);
+        idx++;
+      }
+
+      const accents = [
+        mapPoint({ x: 0.300, y: 0.050 }),
+        mapPoint({ x: 0.350, y: 0.120 }),
+        mapPoint({ x: 0.680, y: 0.052 }),
+        mapPoint({ x: 0.802, y: 0.605 }),
+        mapPoint({ x: 0.430, y: 0.335 }),
+        mapPoint({ x: 0.570, y: 0.335 }),
+        mapPoint({ x: 0.502, y: 0.783 })
+      ];
+
+      accents.forEach((p, i) => {
+        const pulse = 1 + 0.18 * Math.sin(time * 0.003 + i * 0.8);
+        drawGlowStar(p.x, p.y, 3.2 * pulse, 0.98);
+      });
+    }
+
+    let backgroundStars = createBackgroundStars();
+    const portrait = buildPortrait();
+
+    function render(time = 0) {
+      drawBackground(backgroundStars, time);
+      drawPortrait(portrait, time);
+      requestAnimationFrame(render);
+    }
+
+    render();
+
+    canvas.addEventListener("click", () => {
+      backgroundStars = createBackgroundStars();
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key.toLowerCase() === "s") {
+        const a = document.createElement("a");
+        a.href = canvas.toDataURL("image/png");
+        a.download = "retrato-constelacao.png";
+        a.click();
+      }
+    });
+  </script>
+</body>
+</html>
