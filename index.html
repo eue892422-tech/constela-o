@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-
 <title>Constelação</title>
 
 <style>
@@ -17,21 +16,13 @@ html,body{
   width:100%;
   height:100%;
   overflow:hidden;
-  background:#000814;
+  background:#020611;
 }
 
 canvas{
   display:block;
-  width:100vw;
-  height:100vh;
-}
-
-body{
-  background:
-  radial-gradient(circle at top, rgba(40,90,255,.12), transparent 40%),
-  radial-gradient(circle at right, rgba(255,120,220,.08), transparent 35%),
-  radial-gradient(circle at left bottom, rgba(120,255,255,.06), transparent 35%),
-  #000814;
+  width:100%;
+  height:100%;
 }
 </style>
 </head>
@@ -40,505 +31,309 @@ body{
 <canvas id="canvas"></canvas>
 
 <script>
-/* =========================================
-CANVAS
-========================================= */
+/* ==========================================
+   CONFIG
+========================================== */
+
+const IMAGE_NAME = "foto.jpg";
 
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
-let W = innerWidth;
-let H = innerHeight;
+let W = window.innerWidth;
+let H = window.innerHeight;
 
 canvas.width = W;
 canvas.height = H;
 
-/* =========================================
-CONFIG
-========================================= */
-
-const CONFIG = {
-
-  image: "foto.jpg",
-
-  /*
-  menos partículas = mais leve
-  */
-
-  particleGap: 7,
-
-  /*
-  aumenta se quiser mais detalhe
-  */
-
-  maxParticles: 1100,
-
-  /*
-  velocidade da formação
-  */
-
-  speed: 0.022,
-
-  friction: 0.90,
-
-  /*
-  fundo
-  */
-
-  stars: 170,
-
-  /*
-  conexões
-  */
-
-  connectDistance: 20
-};
-
-/* =========================================
-FUNDO
-========================================= */
+/* ==========================================
+   ESTRELAS FUNDO
+========================================== */
 
 const bgStars = [];
 
-for(let i=0;i<CONFIG.stars;i++){
-
+for(let i=0;i<180;i++){
   bgStars.push({
-
     x: Math.random()*W,
     y: Math.random()*H,
-
-    size: Math.random()*2,
-
-    alpha: Math.random(),
-
-    speed: Math.random()*0.4 + 0.1
+    s: Math.random()*2,
+    a: Math.random()
   });
 }
 
-function drawBackground(){
-
-  ctx.fillStyle = "#000814";
-  ctx.fillRect(0,0,W,H);
-
-  for(const s of bgStars){
-
-    s.y += s.speed;
-
-    if(s.y > H){
-
-      s.y = -5;
-      s.x = Math.random()*W;
-    }
-
-    ctx.beginPath();
-
-    ctx.arc(
-      s.x,
-      s.y,
-      s.size,
-      0,
-      Math.PI*2
-    );
-
-    ctx.fillStyle =
-    `rgba(255,255,255,${s.alpha})`;
-
-    ctx.shadowBlur = 8;
-    ctx.shadowColor = "#fff";
-
-    ctx.fill();
-  }
-}
-
-/* =========================================
-METEOROS
-========================================= */
-
-const meteors = [];
-
-function createMeteor(){
-
-  meteors.push({
-
-    x: Math.random()*W,
-    y: Math.random()*H*0.3,
-
-    vx: -12,
-    vy: 6,
-
-    alpha: 1
-  });
-}
-
-setInterval(()=>{
-
-  if(Math.random() > .5){
-
-    createMeteor();
-  }
-
-},2200);
-
-function drawMeteors(){
-
-  for(let i=meteors.length-1;i>=0;i--){
-
-    const m = meteors[i];
-
-    m.x += m.vx;
-    m.y += m.vy;
-
-    m.alpha -= 0.01;
-
-    ctx.beginPath();
-
-    ctx.moveTo(m.x,m.y);
-
-    ctx.lineTo(
-      m.x + 100,
-      m.y - 50
-    );
-
-    ctx.strokeStyle =
-    `rgba(255,255,255,${m.alpha})`;
-
-    ctx.lineWidth = 1.5;
-
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = "#fff";
-
-    ctx.stroke();
-
-    if(m.alpha <= 0){
-
-      meteors.splice(i,1);
-    }
-  }
-}
-
-/* =========================================
-PARTÍCULAS
-========================================= */
+/* ==========================================
+   PARTÍCULAS
+========================================== */
 
 const particles = [];
 
-class Particle{
+/* ==========================================
+   RESIZE
+========================================== */
 
-  constructor(tx,ty,color){
+window.addEventListener("resize",()=>{
+  W = window.innerWidth;
+  H = window.innerHeight;
 
-    this.tx = tx;
-    this.ty = ty;
+  canvas.width = W;
+  canvas.height = H;
+});
 
-    /*
-    começam espalhadas
-    */
+/* ==========================================
+   CARREGAR IMAGEM
+========================================== */
 
-    this.x = Math.random()*W;
-    this.y = Math.random()*H;
+const img = new Image();
+img.src = IMAGE_NAME;
 
-    this.vx = 0;
-    this.vy = 0;
-
-    this.color = color;
-
-    this.size =
-      Math.random()*1.7 + 0.4;
-
-    this.alpha = 0;
-
-    /*
-    delay cria formação gradual
-    */
-
-    this.delay =
-      Math.random()*120;
-  }
-
-  update(){
-
-    if(this.delay > 0){
-
-      this.delay--;
-      return;
-    }
-
-    const dx = this.tx - this.x;
-    const dy = this.ty - this.y;
-
-    this.vx += dx * CONFIG.speed;
-    this.vy += dy * CONFIG.speed;
-
-    this.vx *= CONFIG.friction;
-    this.vy *= CONFIG.friction;
-
-    this.x += this.vx;
-    this.y += this.vy;
-
-    if(this.alpha < 1){
-
-      this.alpha += 0.02;
-    }
-  }
-
-  draw(){
-
-    ctx.beginPath();
-
-    ctx.arc(
-      this.x,
-      this.y,
-      this.size,
-      0,
-      Math.PI*2
-    );
-
-    ctx.fillStyle =
-    `rgba(${this.color.r},
-           ${this.color.g},
-           ${this.color.b},
-           ${this.alpha})`;
-
-    ctx.shadowBlur = 12;
-
-    ctx.shadowColor =
-    `rgb(${this.color.r},
-         ${this.color.g},
-         ${this.color.b})`;
-
-    ctx.fill();
-  }
-}
-
-/* =========================================
-CRIAR IMAGEM
-========================================= */
-
-function createFace(img){
-
-  particles.length = 0;
-
-  const off =
-    document.createElement("canvas");
-
-  const octx =
-    off.getContext("2d");
+img.onload = ()=>{
 
   /*
-  tamanho da imagem
+    AQUI ESTÁ O ERRO DOS CÓDIGOS ANTIGOS:
+    o drawW/drawH ficavam errados
+    e criavam um retângulo gigante.
+
+    Agora isso foi corrigido.
+  */
+
+  const off = document.createElement("canvas");
+  const offCtx = off.getContext("2d");
+
+  /*
+    tamanho REAL da imagem
+  */
+
+  const iw = img.width;
+  const ih = img.height;
+
+  /*
+    escala correta proporcional
   */
 
   const scale = Math.min(
-    W*0.42 / img.width,
-    H*0.75 / img.height
+    (W * 0.55) / iw,
+    (H * 0.75) / ih
   );
 
-  const iw = img.width * scale;
-  const ih = img.height * scale;
+  const drawW = Math.floor(iw * scale);
+  const drawH = Math.floor(ih * scale);
 
-  off.width = iw;
-  off.height = ih;
+  off.width = drawW;
+  off.height = drawH;
 
-  octx.drawImage(
-    img,
-    0,
-    0,
-    iw,
-    ih
-  );
+  offCtx.drawImage(img,0,0,drawW,drawH);
 
-  const data =
-    octx.getImageData(
-      0,
-      0,
-      iw,
-      ih
-    ).data;
-
-  const offsetX =
-    W/2 - iw/2;
-
-  const offsetY =
-    H/2 - ih/2;
+  const data = offCtx.getImageData(0,0,drawW,drawH).data;
 
   /*
-  percorre pixels
+    centralizar corretamente
   */
 
-  for(
-    let y=0;
-    y<ih;
-    y+=CONFIG.particleGap
-  ){
+  const offsetX = (W - drawW)/2;
+  const offsetY = (H - drawH)/2;
 
-    for(
-      let x=0;
-      x<iw;
-      x+=CONFIG.particleGap
-    ){
+  /*
+    menos partículas = mais leve
+  */
 
-      const i =
-      (y*iw + x) * 4;
+  const step = 5;
+
+  for(let y=0;y<drawH;y+=step){
+
+    for(let x=0;x<drawW;x+=step){
+
+      const i = (y * drawW + x) * 4;
 
       const r = data[i];
       const g = data[i+1];
       const b = data[i+2];
       const a = data[i+3];
 
-      if(a < 100){
-        continue;
-      }
-
       /*
-      brilho
+        detectar somente partes reais da foto
       */
 
-      const brightness =
-      (r+g+b)/3;
+      const brightness = (r+g+b)/3;
 
       /*
-      ignora partes muito escuras
+        IGNORA fundo preto/escuro
       */
 
-      if(brightness < 35){
-        continue;
-      }
+      if(a > 100 && brightness > 35){
 
-      /*
-      remove fundos muito vermelhos
-      */
+        /*
+          posição FINAL da imagem
+        */
 
-      if(
-        r > g + 40 &&
-        r > b + 40 &&
-        brightness < 170
-      ){
-        continue;
-      }
+        const tx = x + offsetX;
+        const ty = y + offsetY;
 
-      /*
-      cria partícula
-      */
+        /*
+          partículas começam espalhadas
+        */
 
-      particles.push(
+        particles.push({
 
-        new Particle(
+          x: Math.random()*W,
+          y: Math.random()*H,
 
-          x + offsetX,
-          y + offsetY,
+          tx,
+          ty,
 
-          {r,g,b}
-        )
-      );
+          vx:0,
+          vy:0,
 
-      /*
-      limite
-      */
+          r,
+          g,
+          b,
 
-      if(
-        particles.length >=
-        CONFIG.maxParticles
-      ){
-        return;
+          size: Math.random()*1.8 + 0.4
+        });
       }
     }
   }
+};
+
+/* ==========================================
+   ESTRELA CADENTE
+========================================== */
+
+const shooting = [];
+
+function spawnShooting(){
+
+  shooting.push({
+    x: Math.random()*W,
+    y: Math.random()*200,
+
+    vx:-12,
+    vy:6,
+
+    life:1
+  });
 }
 
-/* =========================================
-CONEXÕES
-========================================= */
-
-function connectParticles(){
-
-  for(let i=0;i<particles.length;i++){
-
-    const a = particles[i];
-
-    for(let j=i+1;j<particles.length;j++){
-
-      const b = particles[j];
-
-      const dx = a.x - b.x;
-      const dy = a.y - b.y;
-
-      const d =
-      Math.sqrt(dx*dx + dy*dy);
-
-      if(d < CONFIG.connectDistance){
-
-        ctx.beginPath();
-
-        ctx.moveTo(a.x,a.y);
-        ctx.lineTo(b.x,b.y);
-
-        ctx.strokeStyle =
-        `rgba(255,255,255,${
-          (1-d/CONFIG.connectDistance)*0.08
-        })`;
-
-        ctx.lineWidth = 0.4;
-
-        ctx.stroke();
-      }
-    }
+setInterval(()=>{
+  if(Math.random() > 0.5){
+    spawnShooting();
   }
-}
+},2500);
 
-/* =========================================
-ANIMAÇÃO
-========================================= */
+/* ==========================================
+   DESENHAR
+========================================== */
 
-function animate(){
+function draw(){
 
-  requestAnimationFrame(animate);
+  /*
+    FUNDO
+  */
 
-  drawBackground();
+  ctx.fillStyle = "#020611";
+  ctx.fillRect(0,0,W,H);
 
-  drawMeteors();
+  /*
+    nebulosa suave
+  */
+
+  const g1 = ctx.createRadialGradient(
+    W*0.3,H*0.3,0,
+    W*0.3,H*0.3,400
+  );
+
+  g1.addColorStop(0,"rgba(80,120,255,0.08)");
+  g1.addColorStop(1,"transparent");
+
+  ctx.fillStyle = g1;
+  ctx.fillRect(0,0,W,H);
+
+  /*
+    estrelas fundo
+  */
+
+  for(const s of bgStars){
+
+    ctx.beginPath();
+
+    ctx.arc(s.x,s.y,s.s,0,Math.PI*2);
+
+    ctx.fillStyle = `rgba(255,255,255,${s.a})`;
+
+    ctx.fill();
+  }
+
+  /*
+    partículas da imagem
+  */
 
   for(const p of particles){
 
-    p.update();
-    p.draw();
+    /*
+      movimento SUAVE
+    */
+
+    const dx = p.tx - p.x;
+    const dy = p.ty - p.y;
+
+    p.vx += dx * 0.0035;
+    p.vy += dy * 0.0035;
+
+    p.vx *= 0.92;
+    p.vy *= 0.92;
+
+    p.x += p.vx;
+    p.y += p.vy;
+
+    /*
+      brilho
+    */
+
+    ctx.beginPath();
+
+    ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+
+    ctx.fillStyle = `rgb(${p.r},${p.g},${p.b})`;
+
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = `rgb(${p.r},${p.g},${p.b})`;
+
+    ctx.fill();
   }
 
-  connectParticles();
+  /*
+    estrelas cadentes
+  */
+
+  for(let i=shooting.length-1;i>=0;i--){
+
+    const s = shooting[i];
+
+    s.x += s.vx;
+    s.y += s.vy;
+
+    s.life -= 0.01;
+
+    ctx.beginPath();
+
+    ctx.moveTo(s.x,s.y);
+
+    ctx.lineTo(s.x+70,s.y-35);
+
+    ctx.strokeStyle = `rgba(255,255,255,${s.life})`;
+
+    ctx.lineWidth = 1.5;
+
+    ctx.stroke();
+
+    if(s.life <= 0){
+      shooting.splice(i,1);
+    }
+  }
+
+  requestAnimationFrame(draw);
 }
 
-/* =========================================
-LOAD DA FOTO
-========================================= */
-
-const img = new Image();
-
-img.src = CONFIG.image;
-
-img.onload = ()=>{
-
-  createFace(img);
-
-  animate();
-};
-
-img.onerror = ()=>{
-
-  alert(
-    "foto.jpg não encontrada"
-  );
-};
-
-/* =========================================
-RESIZE
-========================================= */
-
-addEventListener("resize",()=>{
-
-  W = innerWidth;
-  H = innerHeight;
-
-  canvas.width = W;
-  canvas.height = H;
-});
+draw();
 </script>
 
 </body>
