@@ -1,334 +1,275 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Retrato Constelação</title>
 
-<title>Galaxy Portrait</title>
+  <style>
+    *{
+      margin:0;
+      padding:0;
+      box-sizing:border-box;
+    }
 
-<style>
-*{
-  margin:0;
-  padding:0;
-  box-sizing:border-box;
-}
+    html,body{
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      background:#020816;
+      font-family:Arial, Helvetica, sans-serif;
+    }
 
-html,body{
-  width:100%;
-  height:100%;
-  overflow:hidden;
-  background:#020817;
-  font-family:Arial, Helvetica, sans-serif;
-}
+    canvas{
+      position:fixed;
+      inset:0;
+      width:100%;
+      height:100%;
+      display:block;
+      background:
+        radial-gradient(circle at top, #08172e 0%, #030913 45%, #01040b 100%);
+    }
 
-canvas{
-  position:fixed;
-  inset:0;
-  width:100%;
-  height:100%;
-  display:block;
-  background:
-  radial-gradient(circle at top,#07152a 0%,#020817 50%,#00040b 100%);
-}
-
-#portrait{
-
-  position:fixed;
-
-  left:50%;
-  top:50%;
-
-  transform:translate(-50%,-50%);
-
-  width:min(80vw,900px);
-  max-height:90vh;
-
-  object-fit:contain;
-
-  opacity:0;
-
-  filter:
-  brightness(1.05)
-  contrast(1.05)
-  drop-shadow(0 0 10px rgba(255,255,255,.15))
-  drop-shadow(0 0 30px rgba(120,180,255,.15));
-
-  transition:
-  opacity 2.5s ease;
-
-  pointer-events:none;
-}
-
-.hint{
-  position:fixed;
-  left:50%;
-  bottom:20px;
-  transform:translateX(-50%);
-
-  color:rgba(255,255,255,.7);
-
-  font-size:14px;
-
-  padding:12px 18px;
-
-  border-radius:999px;
-
-  background:rgba(0,0,0,.25);
-
-  border:1px solid rgba(255,255,255,.08);
-
-  backdrop-filter:blur(10px);
-
-  z-index:10;
-}
-</style>
+    .hint{
+      position:fixed;
+      bottom:18px;
+      left:50%;
+      transform:translateX(-50%);
+      color:rgba(255,255,255,.72);
+      font-size:14px;
+      background:rgba(0,0,0,.25);
+      padding:10px 16px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.08);
+      backdrop-filter:blur(8px);
+      z-index:10;
+    }
+  </style>
 </head>
-
 <body>
 
-<canvas id="scene"></canvas>
-
-<!-- SUA IMAGEM -->
-<img id="portrait" src="portrait.png">
+<canvas id="canvas"></canvas>
 
 <div class="hint">
-✨ As estrelas estão revelando o retrato...
+  ✨ As estrelas revelam o retrato
 </div>
 
 <script>
-const canvas = document.getElementById("scene");
+const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
-const portrait = document.getElementById("portrait");
-
 function resize(){
-
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 }
-
 resize();
+window.addEventListener("resize", resize);
 
-window.addEventListener("resize",resize);
+const W = () => canvas.width;
+const H = () => canvas.height;
 
 const stars = [];
-const constellations = [];
+const flyStars = [];
 
-const TAU = Math.PI * 2;
+const bgStarsCount = 240;
+const flyCount = 420;
+
+const portrait = new Image();
+portrait.src = "portrait.png";
+
+let imageReady = false;
+let reveal = 0;
+
+portrait.onload = () => {
+  imageReady = true;
+};
 
 function rand(min,max){
-  return Math.random() * (max-min) + min;
+  return Math.random()*(max-min)+min;
 }
 
-function createStars(){
+function createBackgroundStars(){
 
   stars.length = 0;
 
-  for(let i=0;i<320;i++){
+  for(let i=0;i<bgStarsCount;i++){
 
     stars.push({
-
-      x:rand(0,canvas.width),
-      y:rand(0,canvas.height),
-
-      r:rand(.5,2.5),
-
-      a:rand(.2,1),
-
-      glow:rand(0,TAU),
-
-      vx:rand(-.15,.15),
-      vy:rand(-.15,.15),
-
-      life:1
+      x:Math.random()*W(),
+      y:Math.random()*H(),
+      r:Math.random()*2.2 + .3,
+      a:Math.random()*0.8 + 0.2,
+      s:Math.random()*0.4 + 0.1,
+      p:Math.random()*Math.PI*2
     });
   }
 }
 
-function createConstellations(){
+function createFlyingStars(){
 
-  constellations.length = 0;
+  flyStars.length = 0;
 
-  for(let i=0;i<28;i++){
+  for(let i=0;i<flyCount;i++){
 
-    const group = [];
+    const angle = Math.random()*Math.PI*2;
+    const dist = rand(300,1200);
 
-    const cx = rand(0,canvas.width);
-    const cy = rand(0,canvas.height);
+    flyStars.push({
 
-    const amount = Math.floor(rand(3,8));
+      x:W()/2 + Math.cos(angle)*dist,
+      y:H()/2 + Math.sin(angle)*dist,
 
-    for(let j=0;j<amount;j++){
+      tx:rand(W()*0.12, W()*0.88),
+      ty:rand(H()*0.08, H()*0.92),
 
-      group.push({
+      r:rand(1,4),
+      speed:rand(0.010,0.028),
 
-        x:cx + rand(-60,60),
-        y:cy + rand(-60,60),
-
-        r:rand(.8,2.4)
-      });
-    }
-
-    constellations.push(group);
+      alpha:1
+    });
   }
 }
 
-function drawStar(x,y,r,a=1){
+createBackgroundStars();
+createFlyingStars();
 
-  const g = ctx.createRadialGradient(
-    x,y,0,
-    x,y,r*5
-  );
+function glowStar(x,y,r,a){
+
+  const g = ctx.createRadialGradient(x,y,0,x,y,r*7);
 
   g.addColorStop(0,`rgba(255,255,255,${a})`);
-  g.addColorStop(0.2,`rgba(220,235,255,${a*.9})`);
-  g.addColorStop(0.5,`rgba(120,180,255,${a*.25})`);
-  g.addColorStop(1,`rgba(120,180,255,0)`);
+  g.addColorStop(.2,`rgba(200,220,255,${a*.9})`);
+  g.addColorStop(.45,`rgba(120,170,255,${a*.35})`);
+  g.addColorStop(1,"rgba(120,170,255,0)");
 
   ctx.beginPath();
   ctx.fillStyle = g;
-  ctx.arc(x,y,r*5,0,TAU);
+  ctx.arc(x,y,r*7,0,Math.PI*2);
   ctx.fill();
 
   ctx.beginPath();
   ctx.fillStyle = `rgba(255,255,255,${a})`;
-  ctx.arc(x,y,r,0,TAU);
+  ctx.arc(x,y,r,0,Math.PI*2);
   ctx.fill();
 }
 
-function drawLine(a,b,alpha=.18){
+function drawBackground(time){
 
-  ctx.beginPath();
-
-  ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
-
-  ctx.lineWidth = .6;
-
-  ctx.moveTo(a.x,a.y);
-  ctx.lineTo(b.x,b.y);
-
-  ctx.stroke();
-}
-
-createStars();
-createConstellations();
-
-let revealStarted = false;
-let fadeStars = false;
-
-setTimeout(()=>{
-
-  fadeStars = true;
-
-  portrait.style.opacity = "1";
-
-},3500);
-
-function render(){
-
-  ctx.clearRect(
-    0,0,
-    canvas.width,
-    canvas.height
-  );
-
-  // FUNDO
-  const bg = ctx.createLinearGradient(
-    0,0,0,canvas.height
-  );
-
-  bg.addColorStop(0,"#041224");
-  bg.addColorStop(1,"#00040a");
-
-  ctx.fillStyle = bg;
-
-  ctx.fillRect(
-    0,0,
-    canvas.width,
-    canvas.height
-  );
-
-  // nebulosa
-  const neb = ctx.createRadialGradient(
-    canvas.width/2,
-    canvas.height/2,
-    0,
-    canvas.width/2,
-    canvas.height/2,
-    canvas.width
-  );
-
-  neb.addColorStop(0,"rgba(80,120,255,.08)");
-  neb.addColorStop(1,"rgba(0,0,0,0)");
-
-  ctx.fillStyle = neb;
-
-  ctx.fillRect(
-    0,0,
-    canvas.width,
-    canvas.height
-  );
-
-  // CONSTELAÇÕES
-  for(const group of constellations){
-
-    for(let i=0;i<group.length-1;i++){
-
-      drawLine(
-        group[i],
-        group[i+1],
-        fadeStars ? .04 : .16
-      );
-    }
-
-    for(const s of group){
-
-      drawStar(
-        s.x,
-        s.y,
-        s.r,
-        fadeStars ? .25 : 1
-      );
-    }
-  }
-
-  // ESTRELAS
   for(const s of stars){
 
-    s.x += s.vx;
-    s.y += s.vy;
+    const twinkle =
+      0.7 + Math.sin(time*0.001*s.s + s.p)*0.3;
 
-    if(s.x < 0) s.x = canvas.width;
-    if(s.x > canvas.width) s.x = 0;
-
-    if(s.y < 0) s.y = canvas.height;
-    if(s.y > canvas.height) s.y = 0;
-
-    if(fadeStars){
-
-      s.life -= 0.004;
-
-      if(s.life < 0){
-        s.life = 0;
-      }
-    }
-
-    const pulse =
-      .8 +
-      Math.sin(Date.now()*0.001 + s.glow)*.2;
-
-    drawStar(
+    glowStar(
       s.x,
       s.y,
-      s.r * pulse,
-      s.a * s.life
+      s.r*twinkle,
+      s.a
     );
   }
-
-  requestAnimationFrame(render);
 }
 
-render();
+function drawFlyingStars(){
+
+  for(const s of flyStars){
+
+    s.x += (s.tx - s.x) * s.speed;
+    s.y += (s.ty - s.y) * s.speed;
+
+    if(reveal > 0.55){
+      s.alpha -= 0.02;
+    }
+
+    if(s.alpha < 0){
+      s.alpha = 0;
+    }
+
+    glowStar(s.x,s.y,s.r,s.alpha);
+  }
+}
+
+function drawPortrait(){
+
+  if(!imageReady) return;
+
+  const imgRatio = portrait.width / portrait.height;
+
+  let drawW = W()*0.72;
+  let drawH = drawW / imgRatio;
+
+  if(drawH > H()*0.88){
+    drawH = H()*0.88;
+    drawW = drawH * imgRatio;
+  }
+
+  const x = W()/2 - drawW/2;
+  const y = H()/2 - drawH/2;
+
+  ctx.save();
+
+  ctx.globalAlpha = reveal;
+
+  ctx.shadowBlur = 35;
+  ctx.shadowColor = "rgba(170,210,255,.55)";
+
+  ctx.drawImage(
+    portrait,
+    x,
+    y,
+    drawW,
+    drawH
+  );
+
+  ctx.restore();
+}
+
+function vignette(){
+
+  const g = ctx.createRadialGradient(
+    W()/2,
+    H()/2,
+    H()*0.15,
+    W()/2,
+    H()/2,
+    H()*0.85
+  );
+
+  g.addColorStop(0,"rgba(0,0,0,0)");
+  g.addColorStop(1,"rgba(0,0,0,.55)");
+
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,W(),H());
+}
+
+function animate(time){
+
+  ctx.clearRect(0,0,W(),H());
+
+  const bg = ctx.createLinearGradient(0,0,0,H());
+
+  bg.addColorStop(0,"#07152a");
+  bg.addColorStop(.45,"#020918");
+  bg.addColorStop(1,"#01040a");
+
+  ctx.fillStyle = bg;
+  ctx.fillRect(0,0,W(),H());
+
+  drawBackground(time);
+
+  if(reveal < 1){
+    reveal += 0.0045;
+  }
+
+  drawPortrait();
+
+  drawFlyingStars();
+
+  vignette();
+
+  requestAnimationFrame(animate);
+}
+
+animate();
 </script>
 
 </body>
