@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>Constelação</title>
 
@@ -16,13 +16,11 @@
 
 body{
   overflow:hidden;
-  background:#000;
+  background:black;
 }
 
 canvas{
   display:block;
-  position:fixed;
-  inset:0;
 }
 
 </style>
@@ -33,22 +31,11 @@ canvas{
 
 <script>
 
-/*
-========================================
-CONFIG
-========================================
-*/
-
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
 canvas.width = innerWidth;
 canvas.height = innerHeight;
-
-const particles = [];
-const stars = [];
-
-let faceReady = false;
 
 /*
 ========================================
@@ -56,15 +43,16 @@ FUNDO ESTRELADO
 ========================================
 */
 
-for(let i=0;i<450;i++){
+const stars = [];
+
+for(let i=0;i<300;i++){
 
   stars.push({
 
     x:Math.random()*canvas.width,
     y:Math.random()*canvas.height,
-    z:Math.random()*2,
     size:Math.random()*2,
-    speed:Math.random()*0.3
+    speed:Math.random()*0.5 + 0.1
 
   });
 
@@ -72,24 +60,80 @@ for(let i=0;i<450;i++){
 
 /*
 ========================================
-PARTÍCULA
+NEBULOSAS
 ========================================
 */
 
+const nebulas = [];
+
+for(let i=0;i<7;i++){
+
+  nebulas.push({
+
+    x:Math.random()*canvas.width,
+    y:Math.random()*canvas.height,
+    radius:Math.random()*250 + 120,
+    alpha:Math.random()*0.06 + 0.02,
+    color:[
+      "120,140,255",
+      "255,120,220",
+      "120,255,220",
+      "255,180,120"
+    ][Math.floor(Math.random()*4)]
+
+  });
+
+}
+
+/*
+========================================
+PLANETAS
+========================================
+*/
+
+const planets = [];
+
+for(let i=0;i<5;i++){
+
+  planets.push({
+
+    x:Math.random()*canvas.width,
+    y:Math.random()*canvas.height,
+    radius:Math.random()*50 + 20,
+    glow:Math.random()*40 + 20,
+    color:[
+      "#6ea8ff",
+      "#ff8ad8",
+      "#ffd36e",
+      "#98ffda"
+    ][Math.floor(Math.random()*4)]
+
+  });
+
+}
+
+/*
+========================================
+PARTÍCULAS ROSTO
+========================================
+*/
+
+const particles = [];
+
 class Particle{
 
-  constructor(startX,startY,targetX,targetY,color){
+  constructor(x,y,tx,ty,color){
 
-    this.x = startX;
-    this.y = startY;
+    this.x = x;
+    this.y = y;
 
-    this.tx = targetX;
-    this.ty = targetY;
+    this.tx = tx;
+    this.ty = ty;
 
     this.color = color;
 
     this.size =
-      Math.random()*1.5 + 0.3;
+      Math.random()*1.4 + 0.3;
 
     this.vx = 0;
     this.vy = 0;
@@ -103,17 +147,19 @@ class Particle{
     let dx = this.tx - this.x;
     let dy = this.ty - this.y;
 
-    this.vx += dx * 0.010;
-    this.vy += dy * 0.010;
+    this.vx += dx * 0.008;
+    this.vy += dy * 0.008;
 
-    this.vx *= 0.88;
-    this.vy *= 0.88;
+    this.vx *= 0.90;
+    this.vy *= 0.90;
 
     this.x += this.vx;
     this.y += this.vy;
 
     if(this.alpha < 1){
+
       this.alpha += 0.015;
+
     }
 
   }
@@ -158,38 +204,26 @@ class Particle{
 
 /*
 ========================================
-CARREGAR FOTO
+FOTO
 ========================================
 */
 
-const image = new Image();
+const img = new Image();
 
-/*
-========================================
-NOME DA FOTO
-========================================
-*/
+img.src = "foto.jpg";
 
-image.src = "foto.jpg";
-
-image.onload = () => {
+img.onload = () => {
 
   const off = document.createElement("canvas");
   const offCtx = off.getContext("2d");
 
-  /*
-  ========================================
-  ESCALA
-  ========================================
-  */
+  const scale = 0.55;
 
-  const scale = 0.45;
-
-  off.width = image.width * scale;
-  off.height = image.height * scale;
+  off.width = img.width * scale;
+  off.height = img.height * scale;
 
   offCtx.drawImage(
-    image,
+    img,
     0,
     0,
     off.width,
@@ -203,18 +237,12 @@ image.onload = () => {
     off.height
   ).data;
 
-  /*
-  ========================================
-  MENOS PARTÍCULAS = MAIS LEVE
-  ========================================
-  */
+  for(let y=0;y<off.height;y+=4){
 
-  for(let y=0;y<off.height;y+=3){
-
-    for(let x=0;x<off.width;x+=3){
+    for(let x=0;x<off.width;x+=4){
 
       const index =
-        (y*off.width + x)*4;
+        (y*off.width+x)*4;
 
       const r = data[index];
       const g = data[index+1];
@@ -224,13 +252,7 @@ image.onload = () => {
       const brightness =
         (r+g+b)/3;
 
-      /*
-      ========================================
-      PEGAR SOMENTE PARTES VISÍVEIS
-      ========================================
-      */
-
-      if(a > 120 && brightness > 35){
+      if(a > 100 && brightness > 40){
 
         const tx =
           x +
@@ -244,38 +266,16 @@ image.onload = () => {
 
         /*
         ========================================
-        ESTRELAS VINDO DAS BORDAS
+        COMEÇAR DO CÉU
         ========================================
         */
 
-        let startX;
-        let startY;
+        const startX =
+          tx +
+          (Math.random()-0.5)*350;
 
-        const side = Math.floor(
-          Math.random()*4
-        );
-
-        if(side === 0){
-
-          startX = Math.random()*canvas.width;
-          startY = -100;
-
-        }else if(side === 1){
-
-          startX = canvas.width+100;
-          startY = Math.random()*canvas.height;
-
-        }else if(side === 2){
-
-          startX = Math.random()*canvas.width;
-          startY = canvas.height+100;
-
-        }else{
-
-          startX = -100;
-          startY = Math.random()*canvas.height;
-
-        }
+        const startY =
+          -Math.random()*canvas.height;
 
         particles.push(
 
@@ -299,17 +299,15 @@ image.onload = () => {
 
   }
 
-  faceReady = true;
-
 };
 
 /*
 ========================================
-FUNDO
+FUNDO ESTRELAS
 ========================================
 */
 
-function drawBackground(){
+function drawStars(){
 
   for(let s of stars){
 
@@ -333,7 +331,7 @@ function drawBackground(){
     );
 
     ctx.fillStyle =
-      "rgba(255,255,255,0.8)";
+      "rgba(255,255,255,0.9)";
 
     ctx.shadowBlur = 10;
     ctx.shadowColor = "white";
@@ -346,7 +344,163 @@ function drawBackground(){
 
 /*
 ========================================
-LINHAS CONSTELAÇÃO
+NEBULOSAS
+========================================
+*/
+
+function drawNebulas(){
+
+  for(let n of nebulas){
+
+    const gradient =
+      ctx.createRadialGradient(
+        n.x,
+        n.y,
+        0,
+        n.x,
+        n.y,
+        n.radius
+      );
+
+    gradient.addColorStop(
+      0,
+      `rgba(${n.color},${n.alpha})`
+    );
+
+    gradient.addColorStop(
+      1,
+      "rgba(0,0,0,0)"
+    );
+
+    ctx.fillStyle = gradient;
+
+    ctx.beginPath();
+
+    ctx.arc(
+      n.x,
+      n.y,
+      n.radius,
+      0,
+      Math.PI*2
+    );
+
+    ctx.fill();
+
+  }
+
+}
+
+/*
+========================================
+PLANETAS
+========================================
+*/
+
+function drawPlanets(){
+
+  for(let p of planets){
+
+    ctx.beginPath();
+
+    ctx.arc(
+      p.x,
+      p.y,
+      p.radius,
+      0,
+      Math.PI*2
+    );
+
+    ctx.fillStyle = p.color;
+
+    ctx.shadowBlur = p.glow;
+    ctx.shadowColor = p.color;
+
+    ctx.fill();
+
+    /*
+    ========================================
+    ANEL
+    ========================================
+    */
+
+    ctx.beginPath();
+
+    ctx.ellipse(
+      p.x,
+      p.y,
+      p.radius+15,
+      p.radius/2,
+      Math.PI/6,
+      0,
+      Math.PI*2
+    );
+
+    ctx.strokeStyle =
+      "rgba(255,255,255,0.15)";
+
+    ctx.lineWidth = 2;
+
+    ctx.stroke();
+
+  }
+
+}
+
+/*
+========================================
+CONSTELAÇÕES FUNDO
+========================================
+*/
+
+function drawGalaxyConnections(){
+
+  for(let i=0;i<stars.length;i++){
+
+    for(let j=i+1;j<stars.length;j++){
+
+      const dx =
+        stars[i].x -
+        stars[j].x;
+
+      const dy =
+        stars[i].y -
+        stars[j].y;
+
+      const dist =
+        Math.sqrt(dx*dx + dy*dy);
+
+      if(dist < 80){
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+          stars[i].x,
+          stars[i].y
+        );
+
+        ctx.lineTo(
+          stars[j].x,
+          stars[j].y
+        );
+
+        ctx.strokeStyle =
+          "rgba(255,255,255,0.02)";
+
+        ctx.lineWidth = 0.4;
+
+        ctx.stroke();
+
+      }
+
+    }
+
+  }
+
+}
+
+/*
+========================================
+LINHAS DO ROSTO
 ========================================
 */
 
@@ -367,7 +521,7 @@ function connectParticles(){
       const dist =
         Math.sqrt(dx*dx + dy*dy);
 
-      if(dist < 11){
+      if(dist < 10){
 
         ctx.beginPath();
 
@@ -382,7 +536,7 @@ function connectParticles(){
         );
 
         ctx.strokeStyle =
-          "rgba(255,255,255,0.05)";
+          "rgba(255,255,255,0.04)";
 
         ctx.lineWidth = 0.5;
 
@@ -406,27 +560,32 @@ function animate(){
 
   requestAnimationFrame(animate);
 
-  ctx.clearRect(
+  ctx.fillStyle =
+    "rgba(0,0,0,0.22)";
+
+  ctx.fillRect(
     0,
     0,
     canvas.width,
     canvas.height
   );
 
-  drawBackground();
+  drawNebulas();
 
-  if(faceReady){
+  drawGalaxyConnections();
 
-    for(let p of particles){
+  drawStars();
 
-      p.update();
-      p.draw();
+  drawPlanets();
 
-    }
+  for(let p of particles){
 
-    connectParticles();
+    p.update();
+    p.draw();
 
   }
+
+  connectParticles();
 
 }
 
