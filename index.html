@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Constelação</title>
+<title>Constelação Real</title>
 
 <style>
 
@@ -23,7 +23,7 @@ html,body{
 
 body{
   background:
-  radial-gradient(circle at top,#07111f 0%,#01050b 50%,#000 100%);
+  radial-gradient(circle at center,#081320 0%,#02050b 55%,#000 100%);
 }
 
 canvas{
@@ -61,49 +61,45 @@ CONFIG
 
 const CONFIG={
 
-  /*
-  FOTO
-  */
-
   imageUrl:"foto.jpg",
 
   /*
-  MAIS DETALHE
+  MUITO MAIS DEFINIÇÃO
   */
 
-  maxParticles:950,
+  maxParticles:2200,
 
   /*
-  VELOCIDADE
+  MAIS RÁPIDO
   */
 
-  spring:0.15,
-  friction:0.82,
+  spring:0.045,
+  friction:0.90,
 
   /*
-  DISTÂNCIA INICIAL
+  COMEÇAM LONGE
   */
 
-  spawnRadius:320,
+  spawnRadius:900,
 
   /*
-  LINHAS
+  TAMANHO FOTO
   */
 
-  connectDistance:12,
+  imageScale:0.55,
 
   /*
   FUNDO
   */
 
-  bgStars:160,
-  movingStars:45,
+  bgStars:170,
+  movingStars:55,
 
   /*
-  TAMANHO DA FOTO
+  LINHAS
   */
 
-  imageScale:0.46
+  connectDistance:16
 
 };
 
@@ -134,7 +130,7 @@ for(let i=0;i<CONFIG.bgStars;i++){
     x:rand(0,W),
     y:rand(0,H),
 
-    size:rand(0.4,2),
+    size:rand(0.3,2),
 
     alpha:rand(0.2,1)
 
@@ -144,7 +140,7 @@ for(let i=0;i<CONFIG.bgStars;i++){
 
 /*
 ==================================================
-ESTRELAS CAINDO
+ESTRELAS MOVENDO
 ==================================================
 */
 
@@ -157,13 +153,13 @@ for(let i=0;i<CONFIG.movingStars;i++){
     x:rand(0,W),
     y:rand(-H,H),
 
-    size:rand(0.7,2.4),
+    size:rand(0.5,2.3),
 
-    speed:rand(0.05,0.20),
+    speed:rand(0.05,0.18),
 
-    glow:rand(4,12),
+    pulse:rand(0,Math.PI*2),
 
-    pulse:rand(0,Math.PI*2)
+    glow:rand(4,14)
 
   });
 
@@ -188,20 +184,20 @@ class ShootingStar{
   reset(){
 
     this.x=rand(W*0.2,W);
-    this.y=rand(-100,H*0.3);
+    this.y=rand(-100,H*0.4);
 
-    this.len=rand(80,180);
+    this.len=rand(90,180);
 
-    this.speed=rand(8,16);
+    this.speed=rand(7,15);
 
-    this.alpha=rand(0.4,1);
+    this.alpha=rand(0.5,1);
 
   }
 
   update(){
 
     this.x-=this.speed;
-    this.y+=this.speed*0.5;
+    this.y+=this.speed*0.45;
 
     if(this.x<-200 || this.y>H+200){
 
@@ -219,7 +215,7 @@ class ShootingStar{
 
     ctx.lineTo(
       this.x+this.len,
-      this.y-this.len*0.5
+      this.y-this.len*0.45
     );
 
     ctx.strokeStyle=
@@ -227,7 +223,7 @@ class ShootingStar{
 
     ctx.lineWidth=1.2;
 
-    ctx.shadowBlur=12;
+    ctx.shadowBlur=14;
     ctx.shadowColor="white";
 
     ctx.stroke();
@@ -265,7 +261,7 @@ class Particle{
     this.vx=rand(-1,1);
     this.vy=rand(-1,1);
 
-    this.size=rand(0.7,1.8);
+    this.size=rand(0.5,1.7);
 
     this.alpha=0;
 
@@ -289,7 +285,7 @@ class Particle{
 
     if(this.alpha<1){
 
-      this.alpha+=0.02;
+      this.alpha+=0.01;
 
     }
 
@@ -315,7 +311,7 @@ class Particle{
       ${this.alpha}
     )`;
 
-    ctx.shadowBlur=12;
+    ctx.shadowBlur=10;
 
     ctx.shadowColor=
     `rgb(
@@ -348,7 +344,7 @@ img.onload=()=>{
   const scale=Math.min(
 
     (W*CONFIG.imageScale)/img.width,
-    (H*0.72)/img.height
+    (H*0.75)/img.height
 
   );
 
@@ -379,92 +375,107 @@ img.onload=()=>{
   let created=0;
 
   /*
-  PIXELS ALEATÓRIOS
+  ESCANEAR IMAGEM INTEIRA
   */
 
-  for(let i=0;i<120000;i++){
+  for(let y=0;y<off.height;y+=2){
 
-    const x=Math.floor(
-      Math.random()*off.width
-    );
+    for(let x=0;x<off.width;x+=2){
 
-    const y=Math.floor(
-      Math.random()*off.height
-    );
+      const index=
+      (y*off.width+x)*4;
 
-    const index=
-    (y*off.width+x)*4;
+      const r=data[index];
+      const g=data[index+1];
+      const b=data[index+2];
+      const a=data[index+3];
 
-    const r=data[index];
-    const g=data[index+1];
-    const b=data[index+2];
-    const a=data[index+3];
-
-    if(a<20) continue;
-
-    /*
-    BRILHO
-    */
-
-    const brightness=
-    (r+g+b)/3;
-
-    /*
-    CONTRASTE
-    */
-
-    const contrast=
-    Math.max(r,g,b)-
-    Math.min(r,g,b);
-
-    /*
-    DETECÇÃO MELHOR
-    */
-
-    if(
-      brightness>28 ||
-      contrast>18
-    ){
-
-      const tx=x+offsetX;
-      const ty=y+offsetY;
+      if(a<20) continue;
 
       /*
-      COMEÇAM NO CÉU
+      BRILHO
       */
 
-      const startX=
-      tx+rand(
-        -CONFIG.spawnRadius,
-         CONFIG.spawnRadius
-      );
+      const brightness=
+      (r+g+b)/3;
 
-      const startY=
-      -rand(50,H);
+      /*
+      DIFERENÇA DE COR
+      */
 
-      particles.push(
+      const contrast=
+      Math.max(r,g,b)-
+      Math.min(r,g,b);
 
-        new Particle(
+      /*
+      PEGA QUASE TUDO
+      */
 
-          startX,
-          startY,
+      if(
+        brightness>18 ||
+        contrast>8
+      ){
 
-          tx,
-          ty,
+        /*
+        ALEATÓRIO
+        */
 
-          {r,g,b}
+        if(Math.random()>0.35){
 
-        )
+          continue;
 
-      );
+        }
 
-      created++;
+        const tx=x+offsetX;
+        const ty=y+offsetY;
 
-      if(created>=CONFIG.maxParticles){
+        /*
+        NASCEM LONGE
+        */
 
-        break;
+        const angle=
+        Math.random()*Math.PI*2;
+
+        const radius=
+        rand(200,CONFIG.spawnRadius);
+
+        const startX=
+        tx+Math.cos(angle)*radius;
+
+        const startY=
+        ty+Math.sin(angle)*radius;
+
+        particles.push(
+
+          new Particle(
+
+            startX,
+            startY,
+
+            tx,
+            ty,
+
+            {r,g,b}
+
+          )
+
+        );
+
+        created++;
+
+        if(created>=CONFIG.maxParticles){
+
+          break;
+
+        }
 
       }
+
+    }
+
+    if(created>=CONFIG.maxParticles){
+
+      break;
 
     }
 
@@ -503,7 +514,7 @@ function drawBackgroundStars(){
 
 /*
 ==================================================
-ESTRELAS MOVIMENTO
+ESTRELAS MOVENDO
 ==================================================
 */
 
@@ -513,7 +524,7 @@ function drawMovingStars(time){
 
     s.y+=s.speed;
 
-    if(s.y>H+10){
+    if(s.y>H+20){
 
       s.y=-20;
       s.x=rand(0,W);
@@ -579,7 +590,7 @@ function connectParticles(){
 
     for(
       let j=i+1;
-      j<i+6 && j<particles.length;
+      j<i+4 && j<particles.length;
       j++
     ){
 
@@ -600,9 +611,9 @@ function connectParticles(){
         ctx.lineTo(b.x,b.y);
 
         ctx.strokeStyle=
-        "rgba(255,255,255,0.05)";
+        "rgba(255,255,255,0.03)";
 
-        ctx.lineWidth=0.4;
+        ctx.lineWidth=0.35;
 
         ctx.stroke();
 
@@ -624,15 +635,7 @@ function animate(time=0){
 
   requestAnimationFrame(animate);
 
-  /*
-  SEM TELA CINZA
-  */
-
   ctx.clearRect(0,0,W,H);
-
-  /*
-  FUNDO
-  */
 
   drawBackgroundStars();
 
@@ -640,20 +643,12 @@ function animate(time=0){
 
   drawShootingStars();
 
-  /*
-  PARTÍCULAS
-  */
-
   for(let p of particles){
 
     p.update();
     p.draw();
 
   }
-
-  /*
-  CONSTELAÇÕES
-  */
 
   connectParticles();
 
