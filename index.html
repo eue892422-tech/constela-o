@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Constelação</title>
+  <title>Constelação Rápida</title>
 
   <style>
     *{
@@ -16,15 +16,16 @@
       width:100%;
       height:100%;
       overflow:hidden;
-      background:#02040a;
+      background:#020710;
+      font-family:Arial, Helvetica, sans-serif;
     }
 
     body{
       background:
-        radial-gradient(circle at top, rgba(40,60,110,0.25), transparent 35%),
-        radial-gradient(circle at 20% 80%, rgba(140,60,180,0.18), transparent 28%),
-        radial-gradient(circle at 80% 20%, rgba(80,180,220,0.14), transparent 25%),
-        #02040a;
+        radial-gradient(circle at 20% 20%, rgba(60,110,255,0.10), transparent 25%),
+        radial-gradient(circle at 75% 35%, rgba(255,120,210,0.08), transparent 22%),
+        radial-gradient(circle at 50% 75%, rgba(100,255,220,0.06), transparent 28%),
+        #020710;
     }
 
     canvas{
@@ -32,42 +33,134 @@
       width:100vw;
       height:100vh;
     }
+
+    .status{
+      position:fixed;
+      left:50%;
+      top:28px;
+      transform:translateX(-50%);
+      padding:10px 16px;
+      border-radius:999px;
+      background:rgba(255,255,255,0.08);
+      color:rgba(255,255,255,0.92);
+      font-size:14px;
+      letter-spacing:.3px;
+      backdrop-filter:blur(8px);
+      border:1px solid rgba(255,255,255,0.08);
+      pointer-events:none;
+      z-index:10;
+      transition:opacity .4s ease;
+    }
+
+    .status.hide{
+      opacity:0;
+    }
   </style>
 </head>
 <body>
 
+<div class="status" id="status">montando constelação...</div>
 <canvas id="canvas"></canvas>
 
 <script>
 /*
 ==================================================
-CONFIG
+CONFIGURAÇÃO
 ==================================================
 */
 
-const IMAGE_URL = "https://www.genspark.ai/api/files/s/lR9erwLC";
+const CONFIG = {
+  imageUrl: "foto.jpg",
+
+  /*
+    Quanto menor o pixelStep, mais detalhe.
+    Quanto maior, mais leve e mais rápido.
+  */
+  pixelStepMobile: 6,
+  pixelStepDesktop: 5,
+
+  /*
+    Limite máximo de partículas.
+    Se aumentar demais, pode pesar.
+  */
+  maxParticlesMobile: 900,
+  maxParticlesDesktop: 1400,
+
+  /*
+    Ajustes para identificar pixels da imagem.
+    Se a imagem for muito escura, baixe esses valores.
+  */
+  lumaThresholdStrong: 36,
+  satThresholdStrong: 24,
+  lumaThresholdSoft: 18,
+  satThresholdSoft: 10,
+
+  /*
+    Velocidade da formação.
+    Quanto maior o spring, mais rápido gruda no lugar.
+  */
+  spring: 0.060,
+  friction: 0.83,
+
+  /*
+    Distância inicial das partículas.
+    Mantive perto para formar rápido.
+  */
+  spawnRadiusMin: 70,
+  spawnRadiusMax: 260,
+
+  /*
+    Conexões entre partículas da imagem
+  */
+  connectDistance: 16,
+  showConnections: true,
+
+  /*
+    Fundo
+  */
+  bgStarCountMobile: 130,
+  bgStarCountDesktop: 220,
+  moveStarCountMobile: 40,
+  moveStarCountDesktop: 70,
+  shootingStarIntervalMin: 1800,
+  shootingStarIntervalMax: 4200
+};
+
+/*
+==================================================
+BASE
+==================================================
+*/
 
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d", { alpha: true });
+const statusEl = document.getElementById("status");
+
+const bgCanvas = document.createElement("canvas");
+const bgCtx = bgCanvas.getContext("2d");
 
 let W = window.innerWidth;
 let H = window.innerHeight;
 let DPR = Math.min(window.devicePixelRatio || 1, 2);
 
-const bgCanvas = document.createElement("canvas");
-const bgCtx = bgCanvas.getContext("2d");
-
-let stars = [];
-let galaxyNodes = [];
+let bgStars = [];
+let moveStars = [];
 let nebulas = [];
 let planets = [];
 let particles = [];
+let shootingStars = [];
 
-let imgLoaded = false;
+let mouse = {
+  x: W / 2,
+  y: H / 2,
+  active: false
+};
+
 let sourceImage = null;
-
+let imageReady = false;
 let lastTime = 0;
-let animationId = null;
+let shootTimer = 0;
+let progress = 0;
 
 /*
 ==================================================
@@ -79,8 +172,8 @@ function rand(min, max){
   return Math.random() * (max - min) + min;
 }
 
-function clamp(value, min, max){
-  return Math.max(min, Math.min(max, value));
+function clamp(v, min, max){
+  return Math.max(min, Math.min(max, v));
 }
 
 function distSq(ax, ay, bx, by){
@@ -93,6 +186,20 @@ function pick(arr){
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+function lerp(a, b, t){
+  return a + (b - a) * t;
+}
+
+function isMobile(){
+  return W < 768;
+}
+
+/*
+==================================================
+RESIZE
+==================================================
+*/
+
 function resizeCanvas(){
   W = window.innerWidth;
   H = window.innerHeight;
@@ -102,69 +209,90 @@ function resizeCanvas(){
   canvas.height = H * DPR;
   canvas.style.width = W + "px";
   canvas.style.height = H + "px";
-
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
   bgCanvas.width = W;
   bgCanvas.height = H;
 
-  buildScene();
+  buildBackgroundScene();
 
-  if(imgLoaded){
-    buildFaceParticles();
+  if(imageReady){
+    buildImageParticles();
   }
 }
 
 /*
 ==================================================
-FUNDO ESTÁTICO
+FUNDO
 ==================================================
 */
 
 function createNebulas(){
   nebulas = [];
-
+  const total = isMobile() ? 4 : 6;
   const colors = [
-    "110,140,255",
-    "255,120,220",
-    "130,255,220",
-    "255,190,120",
-    "180,140,255"
+    "100,130,255",
+    "255,120,215",
+    "120,255,230",
+    "255,185,120",
+    "170,130,255"
   ];
-
-  const total = W < 768 ? 5 : 7;
 
   for(let i = 0; i < total; i++){
     nebulas.push({
       x: rand(0, W),
       y: rand(0, H),
-      radius: rand(140, 320),
-      alpha: rand(0.035, 0.09),
+      r: rand(140, 300),
+      a: rand(0.03, 0.08),
       color: pick(colors)
+    });
+  }
+}
+
+function createBackgroundStars(){
+  bgStars = [];
+  moveStars = [];
+
+  const totalBg = isMobile() ? CONFIG.bgStarCountMobile : CONFIG.bgStarCountDesktop;
+  const totalMove = isMobile() ? CONFIG.moveStarCountMobile : CONFIG.moveStarCountDesktop;
+
+  for(let i = 0; i < totalBg; i++){
+    bgStars.push({
+      x: rand(0, W),
+      y: rand(0, H),
+      size: rand(0.4, 1.7),
+      alpha: rand(0.2, 0.95)
+    });
+  }
+
+  for(let i = 0; i < totalMove; i++){
+    moveStars.push({
+      x: rand(0, W),
+      y: rand(0, H),
+      size: rand(0.5, 2.1),
+      alpha: rand(0.25, 1),
+      vx: rand(-0.03, 0.03),
+      vy: rand(0.01, 0.09),
+      twinkleSpeed: rand(0.001, 0.003),
+      twinkleOffset: rand(0, Math.PI * 2),
+      glow: rand(2, 10)
     });
   }
 }
 
 function createPlanets(){
   planets = [];
-
-  const total = W < 900 ? 3 : 5;
-  const colors = [
-    "#78a9ff",
-    "#ff8fda",
-    "#ffd778",
-    "#98ffe0",
-    "#b49cff"
-  ];
+  const total = isMobile() ? 3 : 4;
+  const colors = ["#78a8ff", "#ff8eda", "#9dffd6", "#c8a8ff", "#ffd57d"];
 
   for(let i = 0; i < total; i++){
     planets.push({
-      x: rand(50, W - 50),
-      y: rand(50, H - 50),
-      radius: rand(16, 42),
-      glow: rand(18, 45),
+      x: rand(60, W - 60),
+      y: rand(60, H * 0.6),
+      radius: rand(10, 24),
+      glow: rand(15, 35),
       color: pick(colors),
-      ring: Math.random() > 0.35
+      ring: Math.random() > 0.45
     });
   }
 }
@@ -172,59 +300,50 @@ function createPlanets(){
 function renderStaticBackground(){
   bgCtx.clearRect(0, 0, W, H);
 
-  // base escura
-  const baseGrad = bgCtx.createLinearGradient(0, 0, 0, H);
-  baseGrad.addColorStop(0, "#06111d");
-  baseGrad.addColorStop(0.55, "#07111b");
-  baseGrad.addColorStop(1, "#03060d");
-  bgCtx.fillStyle = baseGrad;
+  const g = bgCtx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "#05111d");
+  g.addColorStop(0.55, "#040c16");
+  g.addColorStop(1, "#020710");
+  bgCtx.fillStyle = g;
   bgCtx.fillRect(0, 0, W, H);
 
-  // nebulosas
   for(const n of nebulas){
-    const g = bgCtx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.radius);
-    g.addColorStop(0, `rgba(${n.color}, ${n.alpha})`);
-    g.addColorStop(0.35, `rgba(${n.color}, ${n.alpha * 0.45})`);
-    g.addColorStop(1, "rgba(0,0,0,0)");
+    const grad = bgCtx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
+    grad.addColorStop(0, `rgba(${n.color},${n.a})`);
+    grad.addColorStop(0.35, `rgba(${n.color},${n.a * 0.45})`);
+    grad.addColorStop(1, "rgba(0,0,0,0)");
 
-    bgCtx.fillStyle = g;
+    bgCtx.fillStyle = grad;
     bgCtx.beginPath();
-    bgCtx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+    bgCtx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
     bgCtx.fill();
   }
 
-  // poeira espacial
-  for(let i = 0; i < 180; i++){
-    const x = rand(0, W);
-    const y = rand(0, H);
-    const r = rand(0.3, 1.4);
-    const a = rand(0.02, 0.08);
-
+  for(const s of bgStars){
     bgCtx.beginPath();
-    bgCtx.arc(x, y, r, 0, Math.PI * 2);
-    bgCtx.fillStyle = `rgba(255,255,255,${a})`;
+    bgCtx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+    bgCtx.fillStyle = `rgba(255,255,255,${s.alpha})`;
     bgCtx.fill();
   }
 
-  // planetas
   for(const p of planets){
-    const g = bgCtx.createRadialGradient(
-      p.x - p.radius * 0.35,
-      p.y - p.radius * 0.35,
-      p.radius * 0.15,
+    const grad = bgCtx.createRadialGradient(
+      p.x - p.radius * 0.3,
+      p.y - p.radius * 0.3,
+      p.radius * 0.2,
       p.x,
       p.y,
       p.radius
     );
 
-    g.addColorStop(0, "rgba(255,255,255,0.95)");
-    g.addColorStop(0.12, p.color);
-    g.addColorStop(1, "rgba(0,0,0,0.18)");
+    grad.addColorStop(0, "rgba(255,255,255,0.95)");
+    grad.addColorStop(0.18, p.color);
+    grad.addColorStop(1, "rgba(0,0,0,0.08)");
 
     bgCtx.save();
     bgCtx.shadowBlur = p.glow;
     bgCtx.shadowColor = p.color;
-    bgCtx.fillStyle = g;
+    bgCtx.fillStyle = grad;
     bgCtx.beginPath();
     bgCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
     bgCtx.fill();
@@ -232,78 +351,65 @@ function renderStaticBackground(){
 
     if(p.ring){
       bgCtx.save();
-      bgCtx.strokeStyle = "rgba(255,255,255,0.18)";
-      bgCtx.lineWidth = 1.4;
       bgCtx.beginPath();
       bgCtx.ellipse(
         p.x,
         p.y,
-        p.radius + 10,
-        p.radius * 0.42,
+        p.radius + 8,
+        p.radius * 0.45,
         Math.PI / 5,
         0,
         Math.PI * 2
       );
+      bgCtx.strokeStyle = "rgba(255,255,255,0.18)";
+      bgCtx.lineWidth = 1.2;
       bgCtx.stroke();
       bgCtx.restore();
     }
   }
 
-  // vinheta
   const vignette = bgCtx.createRadialGradient(
-    W / 2, H / 2, Math.min(W, H) * 0.22,
-    W / 2, H / 2, Math.max(W, H) * 0.75
+    W / 2,
+    H / 2,
+    Math.min(W, H) * 0.25,
+    W / 2,
+    H / 2,
+    Math.max(W, H) * 0.72
   );
   vignette.addColorStop(0, "rgba(0,0,0,0)");
-  vignette.addColorStop(1, "rgba(0,0,0,0.38)");
-
+  vignette.addColorStop(1, "rgba(0,0,0,0.40)");
   bgCtx.fillStyle = vignette;
   bgCtx.fillRect(0, 0, W, H);
 }
 
+function buildBackgroundScene(){
+  createNebulas();
+  createBackgroundStars();
+  createPlanets();
+  renderStaticBackground();
+}
+
 /*
 ==================================================
-ESTRELAS
+ESTRELAS EM MOVIMENTO
 ==================================================
 */
 
-function createStars(){
-  stars = [];
+function drawMoveStars(time, dt){
+  for(const s of moveStars){
+    s.x += s.vx * dt * 3;
+    s.y += s.vy * dt * 4;
 
-  const total = W < 768 ? 160 : 260;
-
-  for(let i = 0; i < total; i++){
-    const layer = Math.random();
-
-    stars.push({
-      x: rand(0, W),
-      y: rand(0, H),
-      size: layer < 0.5 ? rand(0.5, 1.3) : rand(0.8, 2.2),
-      speedY: layer < 0.5 ? rand(0.008, 0.03) : rand(0.03, 0.09),
-      speedX: rand(-0.015, 0.015),
-      alpha: rand(0.4, 1),
-      twinkleSpeed: rand(0.0008, 0.0025),
-      twinkleOffset: rand(0, Math.PI * 2),
-      glow: layer < 0.5 ? rand(0, 4) : rand(4, 10)
-    });
-  }
-}
-
-function drawStars(time, delta){
-  for(const s of stars){
-    s.y += s.speedY * delta * 6;
-    s.x += s.speedX * delta * 3;
-
-    if(s.y > H + 5){
-      s.y = -5;
+    if(s.y > H + 4){
+      s.y = -4;
       s.x = rand(0, W);
     }
 
-    if(s.x < -5) s.x = W + 5;
-    if(s.x > W + 5) s.x = -5;
+    if(s.x < -4) s.x = W + 4;
+    if(s.x > W + 4) s.x = -4;
 
-    const pulse = 0.55 + Math.sin(time * s.twinkleSpeed + s.twinkleOffset) * 0.35;
-    const alpha = clamp(s.alpha * pulse, 0.08, 1);
+    const pulse = 0.6 + Math.sin(time * s.twinkleSpeed + s.twinkleOffset) * 0.35;
+    const alpha = clamp(s.alpha * pulse, 0.05, 1);
 
     ctx.save();
     ctx.beginPath();
@@ -318,70 +424,69 @@ function drawStars(time, delta){
 
 /*
 ==================================================
-NÓS DE CONSTELAÇÃO DO FUNDO
+ESTRELAS CADENTES
 ==================================================
 */
 
-function createGalaxyNodes(){
-  galaxyNodes = [];
+class ShootingStar{
+  constructor(){
+    this.x = rand(W * 0.15, W * 0.85);
+    this.y = rand(-40, H * 0.35);
+    this.len = rand(80, 180);
+    this.speed = rand(10, 18);
+    this.alpha = rand(0.45, 0.9);
+    this.life = 1;
+    this.vx = -this.speed;
+    this.vy = this.speed * 0.55;
+  }
 
-  const total = W < 768 ? 24 : 36;
+  update(dt){
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    this.life -= 0.018 * dt;
+  }
 
-  for(let i = 0; i < total; i++){
-    galaxyNodes.push({
-      x: rand(0, W),
-      y: rand(0, H),
-      vx: rand(-0.035, 0.035),
-      vy: rand(-0.025, 0.025),
-      size: rand(0.8, 1.8),
-      alpha: rand(0.15, 0.45)
-    });
+  draw(){
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(this.x, this.y);
+    ctx.lineTo(this.x + this.len, this.y - this.len * 0.55);
+    ctx.strokeStyle = `rgba(255,255,255,${Math.max(this.life,0) * this.alpha})`;
+    ctx.lineWidth = 1.4;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = "rgba(255,255,255,0.9)";
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  get dead(){
+    return this.life <= 0;
   }
 }
 
-function drawGalaxyConnections(delta){
-  for(const n of galaxyNodes){
-    n.x += n.vx * delta * 2;
-    n.y += n.vy * delta * 2;
+function updateShootingStars(dt){
+  shootTimer -= dt * 16.6667;
 
-    if(n.x < -20) n.x = W + 20;
-    if(n.x > W + 20) n.x = -20;
-    if(n.y < -20) n.y = H + 20;
-    if(n.y > H + 20) n.y = -20;
-  }
-
-  for(let i = 0; i < galaxyNodes.length; i++){
-    const a = galaxyNodes[i];
-
-    for(let j = i + 1; j < galaxyNodes.length; j++){
-      const b = galaxyNodes[j];
-      const d2 = distSq(a.x, a.y, b.x, b.y);
-
-      if(d2 < 120 * 120){
-        const d = Math.sqrt(d2);
-        const alpha = (1 - d / 120) * 0.12;
-
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.strokeStyle = `rgba(180,210,255,${alpha})`;
-        ctx.lineWidth = 0.5;
-        ctx.stroke();
-      }
+  if(shootTimer <= 0){
+    if(Math.random() > 0.35){
+      shootingStars.push(new ShootingStar());
     }
+    shootTimer = rand(CONFIG.shootingStarIntervalMin, CONFIG.shootingStarIntervalMax);
   }
 
-  for(const n of galaxyNodes){
-    ctx.beginPath();
-    ctx.arc(n.x, n.y, n.size, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255,255,255,${n.alpha})`;
-    ctx.fill();
+  for(let i = shootingStars.length - 1; i >= 0; i--){
+    shootingStars[i].update(dt);
+    shootingStars[i].draw();
+
+    if(shootingStars[i].dead){
+      shootingStars.splice(i, 1);
+    }
   }
 }
 
 /*
 ==================================================
-PARTÍCULAS DO ROSTO
+PARTÍCULAS DA IMAGEM
 ==================================================
 */
 
@@ -389,91 +494,131 @@ class Particle{
   constructor(x, y, tx, ty, color){
     this.x = x;
     this.y = y;
-
     this.tx = tx;
     this.ty = ty;
 
-    this.vx = 0;
-    this.vy = 0;
+    this.vx = rand(-0.8, 0.8);
+    this.vy = rand(-0.8, 0.8);
 
-    this.baseSize = rand(0.45, 1.6);
-    this.size = this.baseSize;
+    this.sizeBase = rand(0.5, 1.8);
+    this.size = this.sizeBase;
 
     this.alpha = 0;
-    this.targetAlpha = rand(0.6, 1);
-    this.delay = rand(0, 60);
-
-    this.color = color;
-
-    this.floatX = rand(0.2, 1.4);
-    this.floatY = rand(0.2, 1.4);
+    this.targetAlpha = rand(0.70, 1);
     this.phase = rand(0, Math.PI * 2);
+    this.delay = rand(0, 12);
   }
 
-  update(time, delta){
+  update(time, dt){
     if(this.delay > 0){
-      this.delay -= delta;
+      this.delay -= dt;
       return;
     }
 
-    const fx = Math.cos(time * 0.0015 + this.phase) * this.floatX;
-    const fy = Math.sin(time * 0.0012 + this.phase) * this.floatY;
+    let targetX = this.tx + Math.cos(time * 0.0016 + this.phase) * 0.9;
+    let targetY = this.ty + Math.sin(time * 0.0014 + this.phase) * 0.9;
 
-    const targetX = this.tx + fx;
-    const targetY = this.ty + fy;
+    if(mouse.active){
+      const dxm = this.x - mouse.x;
+      const dym = this.y - mouse.y;
+      const d2 = dxm * dxm + dym * dym;
+
+      if(d2 < 90 * 90){
+        const d = Math.sqrt(d2) || 1;
+        const force = (1 - d / 90) * 1.6;
+        this.vx += (dxm / d) * force * dt;
+        this.vy += (dym / d) * force * dt;
+      }
+    }
 
     const dx = targetX - this.x;
     const dy = targetY - this.y;
 
-    this.vx += dx * 0.018 * delta;
-    this.vy += dy * 0.018 * delta;
+    this.vx += dx * CONFIG.spring * dt;
+    this.vy += dy * CONFIG.spring * dt;
 
-    this.vx *= 0.84;
-    this.vy *= 0.84;
+    this.vx *= CONFIG.friction;
+    this.vy *= CONFIG.friction;
 
     this.x += this.vx;
     this.y += this.vy;
 
-    this.alpha += (this.targetAlpha - this.alpha) * 0.08 * delta;
-    this.size = this.baseSize + Math.sin(time * 0.002 + this.phase) * 0.08;
+    this.alpha += (this.targetAlpha - this.alpha) * 0.10 * dt;
+    this.size = this.sizeBase + Math.sin(time * 0.003 + this.phase) * 0.08;
   }
 
-  draw(){
-    if(this.alpha <= 0.01) return;
+  draw(color){
+    if(this.alpha < 0.02) return;
 
-    ctx.save();
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-
-    ctx.fillStyle = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, ${this.alpha})`;
+    ctx.fillStyle = `rgba(${color.r},${color.g},${color.b},${this.alpha})`;
     ctx.shadowBlur = 10;
-    ctx.shadowColor = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, 0.9)`;
+    ctx.shadowColor = `rgba(${color.r},${color.g},${color.b},1)`;
     ctx.fill();
-    ctx.restore();
   }
 }
 
-function randomSpawnPoint(){
-  const side = Math.floor(Math.random() * 4);
-  const margin = 120;
+function spawnAroundTarget(tx, ty){
+  const angle = Math.random() * Math.PI * 2;
+  const radius = rand(CONFIG.spawnRadiusMin, CONFIG.spawnRadiusMax);
 
-  switch(side){
-    case 0: return { x: rand(-margin, W + margin), y: -rand(30, 220) };           // topo
-    case 1: return { x: W + rand(30, 220), y: rand(-margin, H + margin) };        // direita
-    case 2: return { x: rand(-margin, W + margin), y: H + rand(30, 220) };        // baixo
-    default:return { x: -rand(30, 220), y: rand(-margin, H + margin) };           // esquerda
-  }
+  return {
+    x: tx + Math.cos(angle) * radius,
+    y: ty + Math.sin(angle) * radius
+  };
 }
 
-function buildFaceParticles(){
+function collectTargetsFromImage(data, drawW, drawH, offsetX, offsetY, softMode = false){
+  const result = [];
+  const pixelStep = isMobile() ? CONFIG.pixelStepMobile : CONFIG.pixelStepDesktop;
+  const maxParticles = isMobile() ? CONFIG.maxParticlesMobile : CONFIG.maxParticlesDesktop;
+
+  const lumaT = softMode ? CONFIG.lumaThresholdSoft : CONFIG.lumaThresholdStrong;
+  const satT = softMode ? CONFIG.satThresholdSoft : CONFIG.satThresholdStrong;
+
+  for(let y = 0; y < drawH; y += pixelStep){
+    for(let x = 0; x < drawW; x += pixelStep){
+      const i = (y * drawW + x) * 4;
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const a = data[i + 3];
+
+      if(a < 20) continue;
+
+      const maxC = Math.max(r, g, b);
+      const minC = Math.min(r, g, b);
+      const sat = maxC - minC;
+      const luma = (r + g + b) / 3;
+
+      if(luma > lumaT || sat > satT){
+        result.push({
+          tx: x + offsetX,
+          ty: y + offsetY,
+          color: { r, g, b }
+        });
+
+        if(result.length >= maxParticles){
+          return result;
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+function buildImageParticles(){
   if(!sourceImage) return;
 
   particles = [];
+  progress = 0;
 
   const off = document.createElement("canvas");
   const offCtx = off.getContext("2d", { willReadFrequently: true });
 
-  const maxW = W * (W < 768 ? 0.55 : 0.42);
+  const maxW = W * (isMobile() ? 0.78 : 0.55);
   const maxH = H * 0.72;
 
   const scale = Math.min(maxW / sourceImage.width, maxH / sourceImage.height);
@@ -486,74 +631,84 @@ function buildFaceParticles(){
   offCtx.drawImage(sourceImage, 0, 0, drawW, drawH);
 
   let imageData;
-
   try{
     imageData = offCtx.getImageData(0, 0, drawW, drawH).data;
   }catch(err){
-    console.warn("Não foi possível ler os pixels da imagem. Se houver bloqueio CORS, baixe a imagem localmente.", err);
+    statusEl.textContent = "erro ao ler a imagem";
+    console.warn(err);
     return;
-  }
-
-  const MAX_PARTICLES = W < 768 ? 900 : 1600;
-
-  let step = 4;
-  while((drawW * drawH) / (step * step) > MAX_PARTICLES * 2.2){
-    step++;
   }
 
   const offsetX = W / 2 - drawW / 2;
   const offsetY = H / 2 - drawH / 2;
 
-  for(let y = 0; y < drawH; y += step){
-    for(let x = 0; x < drawW; x += step){
-      const index = (y * drawW + x) * 4;
+  let targets = collectTargetsFromImage(imageData, drawW, drawH, offsetX, offsetY, false);
 
-      const r = imageData[index];
-      const g = imageData[index + 1];
-      const b = imageData[index + 2];
-      const a = imageData[index + 3];
+  // fallback se vier pouca coisa
+  if(targets.length < 160){
+    targets = collectTargetsFromImage(imageData, drawW, drawH, offsetX, offsetY, true);
+  }
 
-      const brightness = (r + g + b) / 3;
+  // fallback extremo: pega pixels espaçados mesmo
+  if(targets.length < 80){
+    const pixelStep = isMobile() ? 7 : 6;
+    const maxParticles = isMobile() ? 700 : 1100;
 
-      if(a > 90 && brightness > 28){
-        const tx = x + offsetX;
-        const ty = y + offsetY;
+    for(let y = 0; y < drawH; y += pixelStep){
+      for(let x = 0; x < drawW; x += pixelStep){
+        const i = (y * drawW + x) * 4;
+        const r = imageData[i];
+        const g = imageData[i + 1];
+        const b = imageData[i + 2];
+        const a = imageData[i + 3];
 
-        const spawn = randomSpawnPoint();
+        if(a > 10){
+          targets.push({
+            tx: x + offsetX,
+            ty: y + offsetY,
+            color: { r, g, b }
+          });
 
-        particles.push(
-          new Particle(
-            spawn.x,
-            spawn.y,
-            tx,
-            ty,
-            { r, g, b }
-          )
-        );
-
-        if(particles.length >= MAX_PARTICLES){
-          return;
+          if(targets.length >= maxParticles) break;
         }
       }
+      if(targets.length >= maxParticles) break;
     }
   }
+
+  for(const t of targets){
+    const start = spawnAroundTarget(t.tx, t.ty);
+
+    particles.push({
+      particle: new Particle(start.x, start.y, t.tx, t.ty, t.color),
+      color: t.color
+    });
+  }
+
+  statusEl.textContent = `constelação pronta: ${particles.length} partículas`;
+
+  setTimeout(() => {
+    statusEl.classList.add("hide");
+  }, 1200);
 }
 
 /*
 ==================================================
-CONEXÕES DAS PARTÍCULAS
+CONEXÕES
 ==================================================
 */
 
 function connectParticles(){
-  const cellSize = 18;
-  const maxDist = 12;
-  const maxDistSq = maxDist * maxDist;
+  if(!CONFIG.showConnections || particles.length === 0) return;
 
+  const cellSize = 20;
+  const maxDist = CONFIG.connectDistance;
+  const maxDistSq = maxDist * maxDist;
   const grid = new Map();
 
-  for(const p of particles){
-    if(p.alpha < 0.25 || p.delay > 0) continue;
+  for(const item of particles){
+    const p = item.particle;
+    if(p.alpha < 0.22 || p.delay > 0) continue;
 
     const gx = Math.floor(p.x / cellSize);
     const gy = Math.floor(p.y / cellSize);
@@ -563,23 +718,19 @@ function connectParticles(){
     grid.get(key).push(p);
   }
 
-  const neighborOffsets = [
-    [0, 0],
-    [1, 0],
-    [0, 1],
-    [1, 1],
-    [-1, 1]
+  const neighbors = [
+    [0,0],[1,0],[0,1],[1,1],[-1,1]
   ];
 
   for(const [key, cell] of grid){
     const [gx, gy] = key.split(",").map(Number);
 
-    for(const [ox, oy] of neighborOffsets){
+    for(const [ox, oy] of neighbors){
       const otherKey = (gx + ox) + "," + (gy + oy);
-      const otherCell = grid.get(otherKey);
-      if(!otherCell) continue;
+      const other = grid.get(otherKey);
+      if(!other) continue;
 
-      if(otherCell === cell){
+      if(other === cell){
         for(let i = 0; i < cell.length; i++){
           const a = cell[i];
           for(let j = i + 1; j < cell.length; j++){
@@ -588,8 +739,7 @@ function connectParticles(){
 
             if(d2 < maxDistSq){
               const d = Math.sqrt(d2);
-              const alpha = (1 - d / maxDist) * 0.16;
-
+              const alpha = (1 - d / maxDist) * 0.18;
               ctx.beginPath();
               ctx.moveTo(a.x, a.y);
               ctx.lineTo(b.x, b.y);
@@ -601,18 +751,17 @@ function connectParticles(){
         }
       }else{
         for(const a of cell){
-          for(const b of otherCell){
+          for(const b of other){
             const d2 = distSq(a.x, a.y, b.x, b.y);
 
             if(d2 < maxDistSq){
               const d = Math.sqrt(d2);
               const alpha = (1 - d / maxDist) * 0.12;
-
               ctx.beginPath();
               ctx.moveTo(a.x, a.y);
               ctx.lineTo(b.x, b.y);
               ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
-              ctx.lineWidth = 0.4;
+              ctx.lineWidth = 0.35;
               ctx.stroke();
             }
           }
@@ -624,16 +773,79 @@ function connectParticles(){
 
 /*
 ==================================================
-SCENE
+DESENHO DA IMAGEM/PARTÍCULAS
 ==================================================
 */
 
-function buildScene(){
-  createNebulas();
-  createPlanets();
-  createStars();
-  createGalaxyNodes();
-  renderStaticBackground();
+function drawParticles(time, dt){
+  if(particles.length === 0) return;
+
+  let settled = 0;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+
+  for(const item of particles){
+    item.particle.update(time, dt);
+    item.particle.draw(item.color);
+
+    const p = item.particle;
+    const dx = p.tx - p.x;
+    const dy = p.ty - p.y;
+    if((dx * dx + dy * dy) < 16){
+      settled++;
+    }
+  }
+
+  ctx.restore();
+
+  progress = settled / particles.length;
+}
+
+/*
+==================================================
+GUIA SUTIL DA FORMA
+==================================================
+*/
+
+function drawFormationHalo(time){
+  if(particles.length === 0) return;
+
+  const alpha = clamp(progress * 0.18, 0, 0.18);
+  if(alpha <= 0.01) return;
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+  for(const item of particles){
+    const p = item.particle;
+    if(p.tx < minX) minX = p.tx;
+    if(p.ty < minY) minY = p.ty;
+    if(p.tx > maxX) maxX = p.tx;
+    if(p.ty > maxY) maxY = p.ty;
+  }
+
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const rx = (maxX - minX) * 0.58;
+  const ry = (maxY - minY) * 0.58;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(
+    cx,
+    cy,
+    rx,
+    ry,
+    Math.sin(time * 0.0002) * 0.1,
+    0,
+    Math.PI * 2
+  );
+  ctx.strokeStyle = `rgba(160,210,255,${alpha})`;
+  ctx.lineWidth = 1;
+  ctx.shadowBlur = 20;
+  ctx.shadowColor = "rgba(160,210,255,0.4)";
+  ctx.stroke();
+  ctx.restore();
 }
 
 /*
@@ -643,36 +855,42 @@ ANIMAÇÃO
 */
 
 function animate(time = 0){
-  animationId = requestAnimationFrame(animate);
+  requestAnimationFrame(animate);
 
   if(!lastTime) lastTime = time;
-  const delta = Math.min((time - lastTime) / 16.6667, 2);
+  const dt = Math.min((time - lastTime) / 16.6667, 2);
   lastTime = time;
 
   ctx.clearRect(0, 0, W, H);
 
-  // fundo pronto
   ctx.drawImage(bgCanvas, 0, 0, W, H);
 
-  // leve brilho ambiente flutuando
-  const driftX = Math.sin(time * 0.00018) * 8;
-  const driftY = Math.cos(time * 0.00015) * 6;
-
+  const driftX = Math.sin(time * 0.00015) * 4;
+  const driftY = Math.cos(time * 0.00012) * 3;
   ctx.save();
-  ctx.globalAlpha = 0.16;
+  ctx.globalAlpha = 0.10;
   ctx.translate(driftX, driftY);
   ctx.drawImage(bgCanvas, 0, 0, W, H);
   ctx.restore();
 
-  drawGalaxyConnections(delta);
-  drawStars(time, delta);
-
-  for(const p of particles){
-    p.update(time, delta);
-    p.draw();
-  }
-
+  drawMoveStars(time, dt);
+  updateShootingStars(dt);
+  drawFormationHalo(time);
+  drawParticles(time, dt);
   connectParticles();
+
+  // brilho central sutil depois de quase formar
+  if(progress > 0.55){
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    const a = (progress - 0.55) * 0.12;
+    const grad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.min(W,H) * 0.22);
+    grad.addColorStop(0, `rgba(180,220,255,${a})`);
+    grad.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
 }
 
 /*
@@ -682,20 +900,48 @@ LOAD DA IMAGEM
 */
 
 function loadImage(){
+  statusEl.textContent = "carregando imagem...";
+  statusEl.classList.remove("hide");
+
   const img = new Image();
   img.crossOrigin = "anonymous";
-  img.src = IMAGE_URL;
+  img.src = CONFIG.imageUrl;
 
   img.onload = () => {
     sourceImage = img;
-    imgLoaded = true;
-    buildFaceParticles();
+    imageReady = true;
+    statusEl.textContent = "montando constelação...";
+    buildImageParticles();
   };
 
   img.onerror = () => {
-    console.warn("Erro ao carregar a imagem.");
+    statusEl.textContent = "erro ao carregar a imagem";
   };
 }
+
+/*
+==================================================
+EVENTOS
+==================================================
+*/
+
+window.addEventListener("mousemove", (e) => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+  mouse.active = true;
+});
+
+window.addEventListener("mouseleave", () => {
+  mouse.active = false;
+});
+
+let resizeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    resizeCanvas();
+  }, 120);
+});
 
 /*
 ==================================================
@@ -706,28 +952,11 @@ INIT
 function init(){
   resizeCanvas();
   loadImage();
-
-  if(animationId) cancelAnimationFrame(animationId);
-  lastTime = 0;
+  shootTimer = rand(CONFIG.shootingStarIntervalMin, CONFIG.shootingStarIntervalMax);
   animate();
 }
 
 init();
-
-/*
-==================================================
-RESPONSIVO
-==================================================
-*/
-
-let resizeTimer = null;
-
-window.addEventListener("resize", () => {
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => {
-    resizeCanvas();
-  }, 120);
-});
 </script>
 
 </body>
