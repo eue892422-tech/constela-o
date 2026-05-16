@@ -37,51 +37,27 @@ canvas{
 
 const IMAGE_NAME = "foto.jpg";
 
-/*
-  MENOR = MAIS DETALHE
-*/
-const PIXEL_STEP = 3;
-
-/*
-  MAIS PARTÍCULAS
-*/
-const MAX_PARTICLES = 12000;
-
-/*
-  AJUDA A PEGAR O CABELO ESCURO
-*/
-const DARK_THRESHOLD = 12;
-
-/*
-  VELOCIDADE
-*/
-const SPRING = 0.010;
-const FRICTION = 0.90;
-
-/* ========================================== */
-
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
-let W = innerWidth;
-let H = innerHeight;
+let W = window.innerWidth;
+let H = window.innerHeight;
 
 canvas.width = W;
 canvas.height = H;
 
 /* ==========================================
-   FUNDO
+   ESTRELAS FUNDO
 ========================================== */
 
 const bgStars = [];
 
-for(let i=0;i<250;i++){
-
+for(let i=0;i<180;i++){
   bgStars.push({
-    x:Math.random()*W,
-    y:Math.random()*H,
-    s:Math.random()*2.2,
-    a:Math.random()
+    x: Math.random()*W,
+    y: Math.random()*H,
+    s: Math.random()*2,
+    a: Math.random()
   });
 }
 
@@ -95,17 +71,16 @@ const particles = [];
    RESIZE
 ========================================== */
 
-addEventListener("resize",()=>{
-
-  W = innerWidth;
-  H = innerHeight;
+window.addEventListener("resize",()=>{
+  W = window.innerWidth;
+  H = window.innerHeight;
 
   canvas.width = W;
   canvas.height = H;
 });
 
 /* ==========================================
-   CARREGAR FOTO
+   CARREGAR IMAGEM
 ========================================== */
 
 const img = new Image();
@@ -113,49 +88,59 @@ img.src = IMAGE_NAME;
 
 img.onload = ()=>{
 
+  /*
+    AQUI ESTÁ O ERRO DOS CÓDIGOS ANTIGOS:
+    o drawW/drawH ficavam errados
+    e criavam um retângulo gigante.
+
+    Agora isso foi corrigido.
+  */
+
   const off = document.createElement("canvas");
-  const octx = off.getContext("2d");
+  const offCtx = off.getContext("2d");
 
   /*
-    TAMANHO MAIS BONITO
+    tamanho REAL da imagem
+  */
+
+  const iw = img.width;
+  const ih = img.height;
+
+  /*
+    escala correta proporcional
   */
 
   const scale = Math.min(
-
-    (W * 0.62) / img.width,
-    (H * 0.82) / img.height
+    (W * 0.55) / iw,
+    (H * 0.75) / ih
   );
 
-  const drawW = img.width * scale;
-  const drawH = img.height * scale;
+  const drawW = Math.floor(iw * scale);
+  const drawH = Math.floor(ih * scale);
 
   off.width = drawW;
   off.height = drawH;
 
-  octx.drawImage(img,0,0,drawW,drawH);
+  offCtx.drawImage(img,0,0,drawW,drawH);
 
-  const data = octx.getImageData(
-    0,
-    0,
-    drawW,
-    drawH
-  ).data;
-
-  const offsetX = W/2 - drawW/2;
-  const offsetY = H/2 - drawH/2;
-
-  let count = 0;
+  const data = offCtx.getImageData(0,0,drawW,drawH).data;
 
   /*
-    AGORA PEGA MUITO MAIS DETALHE
-    inclusive cabelo escuro
+    centralizar corretamente
   */
 
-  for(let y=0;y<drawH;y+=PIXEL_STEP){
+  const offsetX = (W - drawW)/2;
+  const offsetY = (H - drawH)/2;
 
-    for(let x=0;x<drawW;x+=PIXEL_STEP){
+  /*
+    menos partículas = mais leve
+  */
 
-      if(count > MAX_PARTICLES) break;
+  const step = 5;
+
+  for(let y=0;y<drawH;y+=step){
+
+    for(let x=0;x<drawW;x+=step){
 
       const i = (y * drawW + x) * 4;
 
@@ -164,36 +149,46 @@ img.onload = ()=>{
       const b = data[i+2];
       const a = data[i+3];
 
+      /*
+        detectar somente partes reais da foto
+      */
+
       const brightness = (r+g+b)/3;
 
       /*
-        ISSO RESOLVE O CABELO
+        IGNORA fundo preto/escuro
       */
 
-      const isVisible =
-        brightness > DARK_THRESHOLD ||
-        Math.abs(r-g) > 8 ||
-        Math.abs(r-b) > 8;
+      if(a > 100 && brightness > 35){
 
-      if(a > 80 && isVisible){
+        /*
+          posição FINAL da imagem
+        */
+
+        const tx = x + offsetX;
+        const ty = y + offsetY;
+
+        /*
+          partículas começam espalhadas
+        */
 
         particles.push({
 
-          x:Math.random()*W,
-          y:Math.random()*H,
+          x: Math.random()*W,
+          y: Math.random()*H,
 
-          tx:x + offsetX,
-          ty:y + offsetY,
+          tx,
+          ty,
 
-          vx:(Math.random()-0.5)*8,
-          vy:(Math.random()-0.5)*8,
+          vx:0,
+          vy:0,
 
-          r,g,b,
+          r,
+          g,
+          b,
 
-          size:Math.random()*1.4 + 0.6
+          size: Math.random()*1.8 + 0.4
         });
-
-        count++;
       }
     }
   }
@@ -208,32 +203,27 @@ const shooting = [];
 function spawnShooting(){
 
   shooting.push({
+    x: Math.random()*W,
+    y: Math.random()*200,
 
-    x:Math.random()*W,
-    y:Math.random()*250,
-
-    vx:-14,
-    vy:7,
+    vx:-12,
+    vy:6,
 
     life:1
   });
 }
 
 setInterval(()=>{
-
-  if(Math.random() > 0.4){
+  if(Math.random() > 0.5){
     spawnShooting();
   }
-
-},2200);
+},2500);
 
 /* ==========================================
-   ANIMAÇÃO
+   DESENHAR
 ========================================== */
 
-function animate(){
-
-  requestAnimationFrame(animate);
+function draw(){
 
   /*
     FUNDO
@@ -243,26 +233,22 @@ function animate(){
   ctx.fillRect(0,0,W,H);
 
   /*
-    NEBULOSA
+    nebulosa suave
   */
 
-  const neb = ctx.createRadialGradient(
-    W*0.5,
-    H*0.4,
-    0,
-    W*0.5,
-    H*0.4,
-    500
+  const g1 = ctx.createRadialGradient(
+    W*0.3,H*0.3,0,
+    W*0.3,H*0.3,400
   );
 
-  neb.addColorStop(0,"rgba(60,120,255,0.08)");
-  neb.addColorStop(1,"transparent");
+  g1.addColorStop(0,"rgba(80,120,255,0.08)");
+  g1.addColorStop(1,"transparent");
 
-  ctx.fillStyle = neb;
+  ctx.fillStyle = g1;
   ctx.fillRect(0,0,W,H);
 
   /*
-    ESTRELAS FUNDO
+    estrelas fundo
   */
 
   for(const s of bgStars){
@@ -277,53 +263,45 @@ function animate(){
   }
 
   /*
-    PARTÍCULAS DA FOTO
+    partículas da imagem
   */
 
   for(const p of particles){
 
+    /*
+      movimento SUAVE
+    */
+
     const dx = p.tx - p.x;
     const dy = p.ty - p.y;
 
-    /*
-      MAIS SUAVE E MAIS RÁPIDO
-    */
+    p.vx += dx * 0.0035;
+    p.vy += dy * 0.0035;
 
-    p.vx += dx * SPRING;
-    p.vy += dy * SPRING;
-
-    p.vx *= FRICTION;
-    p.vy *= FRICTION;
+    p.vx *= 0.92;
+    p.vy *= 0.92;
 
     p.x += p.vx;
     p.y += p.vy;
 
     /*
-      BRILHO
+      brilho
     */
 
     ctx.beginPath();
 
-    ctx.arc(
-      p.x,
-      p.y,
-      p.size,
-      0,
-      Math.PI*2
-    );
+    ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
 
     ctx.fillStyle = `rgb(${p.r},${p.g},${p.b})`;
 
     ctx.shadowBlur = 8;
-
-    ctx.shadowColor =
-      `rgb(${p.r},${p.g},${p.b})`;
+    ctx.shadowColor = `rgb(${p.r},${p.g},${p.b})`;
 
     ctx.fill();
   }
 
   /*
-    ESTRELAS CADENTES
+    estrelas cadentes
   */
 
   for(let i=shooting.length-1;i>=0;i--){
@@ -333,35 +311,29 @@ function animate(){
     s.x += s.vx;
     s.y += s.vy;
 
-    s.life -= 0.012;
+    s.life -= 0.01;
 
     ctx.beginPath();
 
     ctx.moveTo(s.x,s.y);
 
-    ctx.lineTo(
-      s.x + 80,
-      s.y - 40
-    );
+    ctx.lineTo(s.x+70,s.y-35);
 
-    ctx.strokeStyle =
-      `rgba(255,255,255,${s.life})`;
+    ctx.strokeStyle = `rgba(255,255,255,${s.life})`;
 
     ctx.lineWidth = 1.5;
-
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = "white";
 
     ctx.stroke();
 
     if(s.life <= 0){
-
       shooting.splice(i,1);
     }
   }
+
+  requestAnimationFrame(draw);
 }
 
-animate();
+draw();
 </script>
 
 </body>
