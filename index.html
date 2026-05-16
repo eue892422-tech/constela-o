@@ -1,242 +1,227 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Retrato Estelar</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Constellation Portrait</title>
 
-<style>
+  <style>
+    *{
+      margin:0;
+      padding:0;
+      box-sizing:border-box;
+    }
 
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-}
+    html,body{
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      background:#020611;
+      font-family:Arial,sans-serif;
+    }
 
-html,body{
-    width:100%;
-    height:100%;
-    overflow:hidden;
-    background:#01040a;
-}
+    canvas{
+      position:fixed;
+      inset:0;
+      width:100%;
+      height:100%;
+      display:block;
+      background:
+        radial-gradient(circle at top,#071224 0%,#020611 45%,#00040b 100%);
+    }
 
-canvas{
-    width:100%;
-    height:100%;
-    display:block;
-    background:
-    radial-gradient(circle at top,
-    #071427 0%,
-    #020611 50%,
-    #01040a 100%);
-}
-
-</style>
+    .loading{
+      position:fixed;
+      bottom:25px;
+      left:50%;
+      transform:translateX(-50%);
+      color:rgba(255,255,255,.7);
+      font-size:14px;
+      letter-spacing:.04em;
+      z-index:10;
+      opacity:.8;
+    }
+  </style>
 </head>
+
 <body>
 
-<canvas id="canvas"></canvas>
+<canvas id="scene"></canvas>
+
+<div class="loading">
+  ✨ formando retrato...
+</div>
 
 <script>
-
-const canvas = document.getElementById("canvas");
+const canvas = document.getElementById("scene");
 const ctx = canvas.getContext("2d");
 
 function resize(){
-
-    canvas.width = innerWidth;
-    canvas.height = innerHeight;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
 }
-
 resize();
-
 window.addEventListener("resize", resize);
 
 const stars = [];
-const particles = [];
+const flyingStars = [];
+
+const bgStarCount = 240;
+
+for(let i=0;i<bgStarCount;i++){
+
+  stars.push({
+    x:Math.random()*window.innerWidth,
+    y:Math.random()*window.innerHeight,
+    r:Math.random()*2.2 + 0.2,
+    a:Math.random()*1,
+    t:Math.random()*1000
+  });
+}
+
+for(let i=0;i<220;i++){
+
+  flyingStars.push({
+    x:Math.random()*window.innerWidth,
+    y:Math.random()*window.innerHeight,
+    tx:window.innerWidth/2 + (Math.random()-0.5)*700,
+    ty:window.innerHeight/2 + (Math.random()-0.5)*900,
+    r:Math.random()*2.5 + 0.5,
+    speed:Math.random()*0.015 + 0.008,
+    life:1
+  });
+}
 
 const portrait = new Image();
 
-portrait.src = "./portrait.png";
+portrait.src = "portrait.png";
 
-let loaded = false;
+let portraitOpacity = 0;
 
-portrait.onload = () => {
-
-    loaded = true;
-
-    console.log("imagem carregada");
-};
-
-portrait.onerror = () => {
-
-    console.log("ERRO AO CARREGAR portrait.png");
-};
-
-function rand(min,max){
-
-    return Math.random() * (max-min) + min;
-}
-
-for(let i=0;i<180;i++){
-
-    stars.push({
-
-        x:Math.random()*canvas.width,
-        y:Math.random()*canvas.height,
-        r:Math.random()*2 + 0.2,
-        a:Math.random()*0.7 + 0.2,
-        p:Math.random()*Math.PI*2
-    });
-}
-
-for(let i=0;i<260;i++){
-
-    particles.push({
-
-        x:Math.random()*canvas.width,
-        y:Math.random()*canvas.height,
-
-        vx:rand(-1.5,1.5),
-        vy:rand(-1.5,1.5),
-
-        r:rand(1,3),
-
-        alpha:1
-    });
-}
+let animationFinished = false;
 
 function drawGlow(x,y,r,a){
 
-    const g = ctx.createRadialGradient(
-        x,y,0,
-        x,y,r*6
-    );
+  const g = ctx.createRadialGradient(x,y,0,x,y,r*6);
 
-    g.addColorStop(0,`rgba(255,255,255,${a})`);
-    g.addColorStop(.2,`rgba(210,225,255,${a*.9})`);
-    g.addColorStop(.45,`rgba(120,170,255,${a*.25})`);
-    g.addColorStop(1,"rgba(120,170,255,0)");
+  g.addColorStop(0,`rgba(255,255,255,${a})`);
+  g.addColorStop(0.3,`rgba(180,210,255,${a*0.5})`);
+  g.addColorStop(1,"rgba(180,210,255,0)");
 
-    ctx.beginPath();
-    ctx.fillStyle = g;
-    ctx.arc(x,y,r*6,0,Math.PI*2);
-    ctx.fill();
+  ctx.beginPath();
+  ctx.fillStyle = g;
+  ctx.arc(x,y,r*6,0,Math.PI*2);
+  ctx.fill();
 
-    ctx.beginPath();
-    ctx.fillStyle = `rgba(255,255,255,${a})`;
-    ctx.arc(x,y,r,0,Math.PI*2);
-    ctx.fill();
+  ctx.beginPath();
+  ctx.fillStyle = `rgba(255,255,255,${a})`;
+  ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fill();
 }
-
-let reveal = 0;
 
 function drawBackground(time){
 
-    for(const s of stars){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
-        const twinkle =
-        0.7 + Math.sin(time*0.001 + s.p)*0.3;
+  for(const s of stars){
 
-        drawGlow(
-            s.x,
-            s.y,
-            s.r * twinkle,
-            s.a
-        );
-    }
+    const twinkle =
+      0.65 + Math.sin(time*0.001 + s.t)*0.35;
+
+    drawGlow(
+      s.x,
+      s.y,
+      s.r*twinkle,
+      s.a*twinkle
+    );
+  }
 }
 
-function drawParticles(){
+function drawFlyingStars(){
 
-    for(const p of particles){
+  let done = true;
 
-        p.x += p.vx;
-        p.y += p.vy;
+  for(const s of flyingStars){
 
-        p.alpha -= 0.003;
+    if(s.life > 0){
 
-        if(p.alpha < 0){
+      done = false;
 
-            p.alpha = 0;
-        }
+      s.x += (s.tx - s.x)*s.speed;
+      s.y += (s.ty - s.y)*s.speed;
 
-        drawGlow(
-            p.x,
-            p.y,
-            p.r,
-            p.alpha
-        );
+      s.life -= 0.004;
+
+      drawGlow(s.x,s.y,s.r,s.life);
     }
+  }
+
+  if(done){
+    animationFinished = true;
+  }
 }
 
 function drawPortrait(){
 
-    if(!loaded) return;
+  if(!portrait.complete) return;
 
-    if(reveal < 1){
+  if(portraitOpacity < 1){
+    portraitOpacity += 0.01;
+  }
 
-        reveal += 0.003;
-    }
+  const maxW = canvas.width * 0.82;
+  const maxH = canvas.height * 0.9;
 
-    const ratio =
-    portrait.width / portrait.height;
+  let w = portrait.width;
+  let h = portrait.height;
 
-    let w = canvas.width * 0.72;
-    let h = w / ratio;
+  const scale = Math.min(maxW/w,maxH/h);
 
-    if(h > canvas.height * 0.9){
+  w *= scale;
+  h *= scale;
 
-        h = canvas.height * 0.9;
-        w = h * ratio;
-    }
+  const x = canvas.width/2 - w/2;
+  const y = canvas.height/2 - h/2;
 
-    const x =
-    canvas.width/2 - w/2;
+  ctx.save();
 
-    const y =
-    canvas.height/2 - h/2;
+  ctx.globalAlpha = portraitOpacity;
 
-    ctx.save();
+  ctx.shadowColor = "rgba(180,210,255,.35)";
+  ctx.shadowBlur = 18;
 
-    ctx.globalAlpha = reveal;
+  ctx.drawImage(portrait,x,y,w,h);
 
-    ctx.shadowBlur = 18;
-
-    ctx.shadowColor =
-    "rgba(180,220,255,.25)";
-
-    ctx.drawImage(
-        portrait,
-        x,
-        y,
-        w,
-        h
-    );
-
-    ctx.restore();
+  ctx.restore();
 }
 
 function animate(time){
 
-    ctx.clearRect(
-        0,
-        0,
-        canvas.width,
-        canvas.height
-    );
+  drawBackground(time);
 
-    drawBackground(time);
+  if(!animationFinished){
+
+    drawFlyingStars();
+
+  }else{
 
     drawPortrait();
+  }
 
-    drawParticles();
-
-    requestAnimationFrame(animate);
+  requestAnimationFrame(animate);
 }
 
-animate();
+portrait.onload = () => {
 
+  requestAnimationFrame(animate);
+};
+
+portrait.onerror = () => {
+
+  alert(
+    "ERRO: coloque a imagem portrait.png na mesma pasta do index.html"
+  );
+};
 </script>
 
 </body>
