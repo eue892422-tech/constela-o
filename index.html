@@ -1,211 +1,335 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Constelação</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
-  <style>
-    *{
-      margin:0;
-      padding:0;
-      box-sizing:border-box;
-    }
+<title>Constelação</title>
 
-    body{
-      overflow:hidden;
-      background:black;
-      font-family:Arial, sans-serif;
-    }
+<style>
 
-    canvas{
-      position:fixed;
-      inset:0;
-    }
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+}
 
-    .overlay{
-      position:absolute;
-      inset:0;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      flex-direction:column;
-      pointer-events:none;
-    }
+body{
+  overflow:hidden;
+  background:black;
+  font-family:Arial,sans-serif;
+}
 
-    h1{
-      color:white;
-      font-size:3rem;
-      opacity:0;
-      animation:fadeIn 3s ease forwards;
-      letter-spacing:4px;
-      text-shadow:0 0 20px white;
-    }
+canvas{
+  display:block;
+}
 
-    p{
-      color:#ccc;
-      margin-top:20px;
-      font-size:1.1rem;
-      opacity:0;
-      animation:fadeIn 3s ease forwards;
-      animation-delay:2s;
-    }
+.overlay{
+  position:fixed;
+  inset:0;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  flex-direction:column;
+  pointer-events:none;
+  z-index:10;
+}
 
-    @keyframes fadeIn{
-      to{
-        opacity:1;
-      }
-    }
-  </style>
+.title{
+  color:white;
+  font-size:4rem;
+  letter-spacing:8px;
+  text-shadow:
+    0 0 10px white,
+    0 0 25px white,
+    0 0 60px #7aa6ff;
+  opacity:0;
+  animation:fadeIn 3s ease forwards;
+}
+
+.sub{
+  color:#ddd;
+  margin-top:20px;
+  font-size:1.2rem;
+  opacity:0;
+  animation:fadeIn 3s ease forwards;
+  animation-delay:2s;
+  text-shadow:0 0 15px white;
+}
+
+@keyframes fadeIn{
+  to{
+    opacity:1;
+  }
+}
+
+</style>
 </head>
 <body>
 
-<canvas id="canvas"></canvas>
-
 <div class="overlay">
-  <h1>Você é meu universo</h1>
-  <p>Bilhões de estrelas... mas nenhuma brilha como você.</p>
+  <div class="title">ELOÁ</div>
+  <div class="sub">
+    bilhões de estrelas... mas nenhuma brilha como você
+  </div>
 </div>
 
-<script>
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
-
-canvas.width = innerWidth;
-canvas.height = innerHeight;
-
-let particles = [];
-let stars = [];
-
-const image = new Image();
+<script type="module">
 
 /*
 ========================================
-COLOQUE O NOME DA FOTO AQUI
+THREE JS
 ========================================
 */
 
-image.src = "foto.jpg";
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.161/build/three.module.js";
 
-class Particle{
-  constructor(x,y,targetX,targetY,size){
-    this.x = x;
-    this.y = y;
+import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.161/examples/jsm/controls/OrbitControls.js";
 
-    this.tx = targetX;
-    this.ty = targetY;
+import { EffectComposer } from "https://cdn.jsdelivr.net/npm/three@0.161/examples/jsm/postprocessing/EffectComposer.js";
 
-    this.size = size;
+import { RenderPass } from "https://cdn.jsdelivr.net/npm/three@0.161/examples/jsm/postprocessing/RenderPass.js";
 
-    this.vx = 0;
-    this.vy = 0;
-  }
+import { UnrealBloomPass } from "https://cdn.jsdelivr.net/npm/three@0.161/examples/jsm/postprocessing/UnrealBloomPass.js";
 
-  update(){
+/*
+========================================
+CENA
+========================================
+*/
 
-    let dx = this.tx - this.x;
-    let dy = this.ty - this.y;
+const scene = new THREE.Scene();
 
-    this.vx += dx * 0.002;
-    this.vy += dy * 0.002;
+scene.fog = new THREE.FogExp2(0x000000,0.0009);
 
-    this.vx *= 0.92;
-    this.vy *= 0.92;
+const camera = new THREE.PerspectiveCamera(
+  60,
+  window.innerWidth/window.innerHeight,
+  0.1,
+  2000
+);
 
-    this.x += this.vx;
-    this.y += this.vy;
-  }
+camera.position.z = 220;
 
-  draw(){
+const renderer = new THREE.WebGLRenderer({
+  antialias:true
+});
 
-    ctx.beginPath();
+renderer.setSize(
+  window.innerWidth,
+  window.innerHeight
+);
 
-    ctx.arc(this.x,this.y,this.size,0,Math.PI*2);
+renderer.setPixelRatio(devicePixelRatio);
 
-    ctx.fillStyle = "white";
+document.body.appendChild(renderer.domElement);
 
-    ctx.shadowColor = "white";
-    ctx.shadowBlur = 15;
+/*
+========================================
+BLOOM CINEMATOGRÁFICO
+========================================
+*/
 
-    ctx.fill();
-  }
+const composer = new EffectComposer(renderer);
+
+composer.addPass(
+  new RenderPass(scene,camera)
+);
+
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(
+    window.innerWidth,
+    window.innerHeight
+  ),
+  1.8,
+  0.4,
+  0.85
+);
+
+composer.addPass(bloomPass);
+
+/*
+========================================
+ESTRELAS DE FUNDO
+========================================
+*/
+
+const bgGeometry = new THREE.BufferGeometry();
+
+const bgCount = 5000;
+
+const bgPositions = [];
+
+for(let i=0;i<bgCount;i++){
+
+  bgPositions.push(
+    (Math.random()-0.5)*3000,
+    (Math.random()-0.5)*3000,
+    (Math.random()-0.5)*3000
+  );
+
 }
 
-function createBackgroundStars(){
+bgGeometry.setAttribute(
+  "position",
+  new THREE.Float32BufferAttribute(
+    bgPositions,
+    3
+  )
+);
 
-  for(let i=0;i<300;i++){
+const bgMaterial = new THREE.PointsMaterial({
+  color:0xffffff,
+  size:1.3,
+  transparent:true,
+  opacity:0.9
+});
 
-    stars.push({
-      x:Math.random()*canvas.width,
-      y:Math.random()*canvas.height,
-      size:Math.random()*2
-    });
+const backgroundStars = new THREE.Points(
+  bgGeometry,
+  bgMaterial
+);
 
-  }
+scene.add(backgroundStars);
+
+/*
+========================================
+NEBULOSA
+========================================
+*/
+
+const nebulaGeometry = new THREE.BufferGeometry();
+
+const nebulaPositions = [];
+
+for(let i=0;i<2000;i++){
+
+  nebulaPositions.push(
+    (Math.random()-0.5)*1000,
+    (Math.random()-0.5)*1000,
+    (Math.random()-0.5)*1000
+  );
 
 }
 
-function drawBackgroundStars(){
+nebulaGeometry.setAttribute(
+  "position",
+  new THREE.Float32BufferAttribute(
+    nebulaPositions,
+    3
+  )
+);
 
-  for(let s of stars){
+const nebulaMaterial = new THREE.PointsMaterial({
+  color:0x7aa6ff,
+  size:3,
+  transparent:true,
+  opacity:0.05
+});
 
-    ctx.beginPath();
+const nebula = new THREE.Points(
+  nebulaGeometry,
+  nebulaMaterial
+);
 
-    ctx.arc(s.x,s.y,s.size,0,Math.PI*2);
+scene.add(nebula);
 
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
+/*
+========================================
+IMAGEM
+========================================
+*/
 
-    ctx.fill();
+const img = new Image();
 
-  }
+/*
+========================================
+MUDE O NOME DA FOTO AQUI
+========================================
+*/
 
-}
+img.src = "foto.jpg";
 
-image.onload = () => {
+let faceParticles;
 
-  const off = document.createElement("canvas");
-  const offCtx = off.getContext("2d");
+/*
+========================================
+CRIAR ROSTO
+========================================
+*/
 
-  const scale = 0.55;
+img.onload = () => {
 
-  off.width = image.width * scale;
-  off.height = image.height * scale;
+  const tempCanvas = document.createElement("canvas");
+  const ctx = tempCanvas.getContext("2d");
 
-  offCtx.drawImage(image,0,0,off.width,off.height);
+  const scale = 0.45;
 
-  const data = offCtx.getImageData(
+  tempCanvas.width = img.width * scale;
+  tempCanvas.height = img.height * scale;
+
+  ctx.drawImage(
+    img,
     0,
     0,
-    off.width,
-    off.height
+    tempCanvas.width,
+    tempCanvas.height
+  );
+
+  const data = ctx.getImageData(
+    0,
+    0,
+    tempCanvas.width,
+    tempCanvas.height
   ).data;
 
-  for(let y=0;y<off.height;y+=3){
+  const positions = [];
+  const colors = [];
 
-    for(let x=0;x<off.width;x+=3){
+  for(let y=0;y<tempCanvas.height;y+=2){
 
-      const index = (y*off.width + x)*4;
+    for(let x=0;x<tempCanvas.width;x+=2){
+
+      const index =
+        (y*tempCanvas.width+x)*4;
 
       const r = data[index];
       const g = data[index+1];
       const b = data[index+2];
       const a = data[index+3];
 
-      const brightness = (r+g+b)/3;
+      const brightness =
+        (r+g+b)/3;
 
-      if(a > 100 && brightness > 40){
+      if(a > 120 && brightness > 35){
 
-        const px = x + canvas.width/2 - off.width/2;
-        const py = y + canvas.height/2 - off.height/2;
+        const px =
+          x - tempCanvas.width/2;
 
-        particles.push(
-          new Particle(
-            Math.random()*canvas.width,
-            Math.random()*canvas.height,
-            px,
-            py,
-            1.2
-          )
+        const py =
+          -y + tempCanvas.height/2;
+
+        const pz =
+          (Math.random()-0.5)*25;
+
+        positions.push(
+
+          (Math.random()-0.5)*2000,
+          (Math.random()-0.5)*2000,
+          (Math.random()-0.5)*2000
+
+        );
+
+        colors.push(
+          r/255,
+          g/255,
+          b/255
+        );
+
+        positions.push(
+          px*1.8,
+          py*1.8,
+          pz
         );
 
       }
@@ -213,83 +337,151 @@ image.onload = () => {
     }
 
   }
+
+  const geometry = new THREE.BufferGeometry();
+
+  geometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(
+      positions,
+      3
+    )
+  );
+
+  geometry.setAttribute(
+    "color",
+    new THREE.Float32BufferAttribute(
+      colors,
+      3
+    )
+  );
+
+  const material = new THREE.PointsMaterial({
+
+    size:1.7,
+    vertexColors:true,
+    transparent:true,
+    opacity:1,
+    blending:THREE.AdditiveBlending
+
+  });
+
+  faceParticles = new THREE.Points(
+    geometry,
+    material
+  );
+
+  scene.add(faceParticles);
 
 };
 
-createBackgroundStars();
+/*
+========================================
+LUZES
+========================================
+*/
 
-function connectParticles(){
+const light1 = new THREE.PointLight(
+  0xffffff,
+  2
+);
 
-  for(let a=0;a<particles.length;a++){
+light1.position.set(200,200,200);
 
-    for(let b=a;b<particles.length;b++){
+scene.add(light1);
 
-      let dx = particles[a].x - particles[b].x;
-      let dy = particles[a].y - particles[b].y;
+const light2 = new THREE.PointLight(
+  0x7aa6ff,
+  5
+);
 
-      let dist = Math.sqrt(dx*dx + dy*dy);
+light2.position.set(-200,-100,100);
 
-      if(dist < 12){
+scene.add(light2);
 
-        ctx.beginPath();
+/*
+========================================
+CONTROLES
+========================================
+*/
 
-        ctx.moveTo(
-          particles[a].x,
-          particles[a].y
-        );
+const controls = new OrbitControls(
+  camera,
+  renderer.domElement
+);
 
-        ctx.lineTo(
-          particles[b].x,
-          particles[b].y
-        );
+controls.enableZoom = false;
+controls.enablePan = false;
 
-        ctx.strokeStyle =
-          "rgba(255,255,255,0.08)";
+/*
+========================================
+ANIMAÇÃO
+========================================
+*/
 
-        ctx.lineWidth = 0.4;
-
-        ctx.stroke();
-
-      }
-
-    }
-
-  }
-
-}
+let clock = new THREE.Clock();
 
 function animate(){
 
   requestAnimationFrame(animate);
 
-  ctx.clearRect(
-    0,
-    0,
-    canvas.width,
-    canvas.height
-  );
+  const time = clock.getElapsedTime();
 
-  drawBackgroundStars();
+  backgroundStars.rotation.y += 0.0003;
 
-  for(let p of particles){
+  nebula.rotation.y += 0.0006;
 
-    p.update();
-    p.draw();
+  if(faceParticles){
+
+    faceParticles.rotation.y =
+      Math.sin(time*0.2)*0.08;
+
+    faceParticles.rotation.x =
+      Math.cos(time*0.15)*0.03;
+
+    faceParticles.material.size =
+      1.5 + Math.sin(time*2)*0.2;
 
   }
 
-  connectParticles();
+  camera.position.z =
+    220 + Math.sin(time*0.4)*8;
+
+  composer.render();
 
 }
 
 animate();
 
-window.addEventListener("resize",()=>{
+/*
+========================================
+RESPONSIVO
+========================================
+*/
 
-  canvas.width = innerWidth;
-  canvas.height = innerHeight;
+window.addEventListener(
+  "resize",
+  ()=>{
 
-});
+    camera.aspect =
+      window.innerWidth/
+      window.innerHeight;
+
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(
+      window.innerWidth,
+      window.innerHeight
+    );
+
+    composer.setSize(
+      window.innerWidth,
+      window.innerHeight
+    );
+
+  }
+);
+
 </script>
 
 </body>
