@@ -1,57 +1,54 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Retrato Constelação</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Constelação Retrato</title>
 
-  <style>
-    *{
-      margin:0;
-      padding:0;
-      box-sizing:border-box;
-    }
+<style>
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+}
 
-    html,body{
-      width:100%;
-      height:100%;
-      overflow:hidden;
-      background:#020816;
-      font-family:Arial, Helvetica, sans-serif;
-    }
+html,body{
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:#020611;
+}
 
-    canvas{
-      position:fixed;
-      inset:0;
-      width:100%;
-      height:100%;
-      display:block;
-      background:
-        radial-gradient(circle at top, #08172e 0%, #030913 45%, #01040b 100%);
-    }
+canvas{
+  width:100%;
+  height:100%;
+  display:block;
+  background:
+    radial-gradient(circle at top, #08152b 0%, #020611 45%, #01040a 100%);
+}
 
-    .hint{
-      position:fixed;
-      bottom:18px;
-      left:50%;
-      transform:translateX(-50%);
-      color:rgba(255,255,255,.72);
-      font-size:14px;
-      background:rgba(0,0,0,.25);
-      padding:10px 16px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.08);
-      backdrop-filter:blur(8px);
-      z-index:10;
-    }
-  </style>
+.info{
+  position:fixed;
+  bottom:18px;
+  left:50%;
+  transform:translateX(-50%);
+  color:rgba(255,255,255,.7);
+  font-family:Arial;
+  font-size:14px;
+  background:rgba(0,0,0,.3);
+  border:1px solid rgba(255,255,255,.08);
+  padding:10px 16px;
+  border-radius:999px;
+  backdrop-filter:blur(10px);
+}
+</style>
 </head>
 <body>
 
 <canvas id="canvas"></canvas>
 
-<div class="hint">
-  ✨ As estrelas revelam o retrato
+<div class="info">
+✨ As estrelas revelam o retrato
 </div>
 
 <script>
@@ -59,29 +56,22 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
 function resize(){
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
 }
 resize();
-window.addEventListener("resize", resize);
-
-const W = () => canvas.width;
-const H = () => canvas.height;
+addEventListener("resize", resize);
 
 const stars = [];
-const flyStars = [];
-
-const bgStarsCount = 240;
-const flyCount = 420;
+const transitionStars = [];
 
 const portrait = new Image();
 portrait.src = "portrait.png";
 
-let imageReady = false;
-let reveal = 0;
+let imageLoaded = false;
 
 portrait.onload = () => {
-  imageReady = true;
+  imageLoaded = true;
 };
 
 function rand(min,max){
@@ -92,59 +82,53 @@ function createBackgroundStars(){
 
   stars.length = 0;
 
-  for(let i=0;i<bgStarsCount;i++){
+  for(let i=0;i<180;i++){
 
     stars.push({
-      x:Math.random()*W(),
-      y:Math.random()*H(),
-      r:Math.random()*2.2 + .3,
-      a:Math.random()*0.8 + 0.2,
-      s:Math.random()*0.4 + 0.1,
-      p:Math.random()*Math.PI*2
+      x:Math.random()*canvas.width,
+      y:Math.random()*canvas.height,
+      r:Math.random()*2 + 0.3,
+      alpha:Math.random()*0.8 + 0.2,
+      phase:Math.random()*Math.PI*2
     });
   }
 }
 
-function createFlyingStars(){
+function createTransitionStars(){
 
-  flyStars.length = 0;
+  transitionStars.length = 0;
 
-  for(let i=0;i<flyCount;i++){
+  for(let i=0;i<280;i++){
 
-    const angle = Math.random()*Math.PI*2;
-    const dist = rand(300,1200);
+    transitionStars.push({
 
-    flyStars.push({
+      x:Math.random()*canvas.width,
+      y:Math.random()*canvas.height,
 
-      x:W()/2 + Math.cos(angle)*dist,
-      y:H()/2 + Math.sin(angle)*dist,
+      size:rand(1,4),
+      alpha:1,
 
-      tx:rand(W()*0.12, W()*0.88),
-      ty:rand(H()*0.08, H()*0.92),
-
-      r:rand(1,4),
-      speed:rand(0.010,0.028),
-
-      alpha:1
+      vx:rand(-1.5,1.5),
+      vy:rand(-1.5,1.5)
     });
   }
 }
 
 createBackgroundStars();
-createFlyingStars();
+createTransitionStars();
 
 function glowStar(x,y,r,a){
 
-  const g = ctx.createRadialGradient(x,y,0,x,y,r*7);
+  const g = ctx.createRadialGradient(x,y,0,x,y,r*6);
 
   g.addColorStop(0,`rgba(255,255,255,${a})`);
-  g.addColorStop(.2,`rgba(200,220,255,${a*.9})`);
-  g.addColorStop(.45,`rgba(120,170,255,${a*.35})`);
-  g.addColorStop(1,"rgba(120,170,255,0)");
+  g.addColorStop(.2,`rgba(210,225,255,${a*.9})`);
+  g.addColorStop(.45,`rgba(130,170,255,${a*.3})`);
+  g.addColorStop(1,"rgba(130,170,255,0)");
 
   ctx.beginPath();
   ctx.fillStyle = g;
-  ctx.arc(x,y,r*7,0,Math.PI*2);
+  ctx.arc(x,y,r*6,0,Math.PI*2);
   ctx.fill();
 
   ctx.beginPath();
@@ -153,118 +137,134 @@ function glowStar(x,y,r,a){
   ctx.fill();
 }
 
+let portraitAlpha = 0;
+let transitionAlpha = 1;
+
 function drawBackground(time){
 
   for(const s of stars){
 
     const twinkle =
-      0.7 + Math.sin(time*0.001*s.s + s.p)*0.3;
+      0.7 + Math.sin(time*0.001 + s.phase)*0.3;
 
     glowStar(
       s.x,
       s.y,
       s.r*twinkle,
-      s.a
+      s.alpha
     );
   }
 }
 
-function drawFlyingStars(){
+function drawTransitionStars(){
 
-  for(const s of flyStars){
+  for(const s of transitionStars){
 
-    s.x += (s.tx - s.x) * s.speed;
-    s.y += (s.ty - s.y) * s.speed;
+    s.x += s.vx;
+    s.y += s.vy;
 
-    if(reveal > 0.55){
-      s.alpha -= 0.02;
-    }
+    s.alpha -= 0.0035;
 
-    if(s.alpha < 0){
-      s.alpha = 0;
-    }
+    glowStar(
+      s.x,
+      s.y,
+      s.size,
+      s.alpha
+    );
+  }
 
-    glowStar(s.x,s.y,s.r,s.alpha);
+  if(transitionAlpha > 0){
+    transitionAlpha -= 0.003;
   }
 }
 
 function drawPortrait(){
 
-  if(!imageReady) return;
+  if(!imageLoaded) return;
 
-  const imgRatio = portrait.width / portrait.height;
-
-  let drawW = W()*0.72;
-  let drawH = drawW / imgRatio;
-
-  if(drawH > H()*0.88){
-    drawH = H()*0.88;
-    drawW = drawH * imgRatio;
+  if(portraitAlpha < 1){
+    portraitAlpha += 0.004;
   }
 
-  const x = W()/2 - drawW/2;
-  const y = H()/2 - drawH/2;
+  const ratio = portrait.width / portrait.height;
+
+  let w = canvas.width * 0.72;
+  let h = w / ratio;
+
+  if(h > canvas.height * 0.9){
+    h = canvas.height * 0.9;
+    w = h * ratio;
+  }
+
+  const x = canvas.width/2 - w/2;
+  const y = canvas.height/2 - h/2;
 
   ctx.save();
 
-  ctx.globalAlpha = reveal;
+  ctx.globalAlpha = portraitAlpha;
 
-  ctx.shadowBlur = 35;
-  ctx.shadowColor = "rgba(170,210,255,.55)";
+  ctx.shadowBlur = 25;
+  ctx.shadowColor = "rgba(180,220,255,.35)";
 
   ctx.drawImage(
     portrait,
     x,
     y,
-    drawW,
-    drawH
+    w,
+    h
   );
 
   ctx.restore();
 }
 
-function vignette(){
+function drawVignette(){
 
   const g = ctx.createRadialGradient(
-    W()/2,
-    H()/2,
-    H()*0.15,
-    W()/2,
-    H()/2,
-    H()*0.85
+    canvas.width/2,
+    canvas.height/2,
+    canvas.height*0.2,
+
+    canvas.width/2,
+    canvas.height/2,
+    canvas.height*0.9
   );
 
   g.addColorStop(0,"rgba(0,0,0,0)");
   g.addColorStop(1,"rgba(0,0,0,.55)");
 
   ctx.fillStyle = g;
-  ctx.fillRect(0,0,W(),H());
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 }
 
 function animate(time){
 
-  ctx.clearRect(0,0,W(),H());
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  const bg = ctx.createLinearGradient(0,0,0,H());
+  const bg = ctx.createLinearGradient(
+    0,0,0,canvas.height
+  );
 
-  bg.addColorStop(0,"#07152a");
-  bg.addColorStop(.45,"#020918");
+  bg.addColorStop(0,"#071326");
+  bg.addColorStop(.45,"#020611");
   bg.addColorStop(1,"#01040a");
 
   ctx.fillStyle = bg;
-  ctx.fillRect(0,0,W(),H());
+  ctx.fillRect(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
 
   drawBackground(time);
 
-  if(reveal < 1){
-    reveal += 0.0045;
-  }
-
   drawPortrait();
 
-  drawFlyingStars();
+  if(transitionAlpha > 0){
+    drawTransitionStars();
+  }
 
-  vignette();
+  drawVignette();
 
   requestAnimationFrame(animate);
 }
