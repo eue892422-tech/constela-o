@@ -18,12 +18,12 @@ html,body{
   width:100%;
   height:100%;
   overflow:hidden;
-  background:black;
+  background:#000;
 }
 
 body{
   background:
-  radial-gradient(circle at center,#06101d 0%,#01040a 60%,#000 100%);
+  radial-gradient(circle at top,#07111f 0%,#01050b 50%,#000 100%);
 }
 
 canvas{
@@ -61,41 +61,49 @@ CONFIG
 
 const CONFIG={
 
+  /*
+  FOTO
+  */
+
   imageUrl:"foto.jpg",
 
   /*
-  MUITO MENOS PARTÍCULAS
+  MAIS DETALHE
   */
 
-  pixelStep:11,
-
-  maxParticles:380,
+  pixelStep:7,
 
   /*
-  FORMA RÁPIDO
+  LEVE E RÁPIDO
   */
 
-  spring:0.18,
-  friction:0.80,
+  maxParticles:700,
 
   /*
-  ESTRELAS MAIS SEPARADAS
+  VELOCIDADE
   */
 
-  spawnRadius:260,
+  spring:0.16,
+  friction:0.82,
 
   /*
-  SEM MUITAS LINHAS
+  ESTRELAS COMEÇAM LONGE
   */
 
-  connectDistance:5,
+  spawnRadius:320,
 
   /*
-  FUNDO LEVE
+  LINHAS
   */
 
-  bgStars:120,
-  movingStars:28
+  connectDistance:10,
+
+  /*
+  FUNDO
+  */
+
+  bgStars:140,
+  movingStars:40
 
 };
 
@@ -113,7 +121,7 @@ function rand(min,max){
 
 /*
 ========================================
-FUNDO
+ESTRELAS FUNDO
 ========================================
 */
 
@@ -126,8 +134,7 @@ for(let i=0;i<CONFIG.bgStars;i++){
     x:rand(0,W),
     y:rand(0,H),
 
-    size:rand(0.5,1.8),
-
+    size:rand(0.4,2),
     alpha:rand(0.2,1)
 
   });
@@ -136,7 +143,7 @@ for(let i=0;i<CONFIG.bgStars;i++){
 
 /*
 ========================================
-ESTRELAS MOVENDO
+ESTRELAS CAINDO
 ========================================
 */
 
@@ -147,13 +154,13 @@ for(let i=0;i<CONFIG.movingStars;i++){
   movingStars.push({
 
     x:rand(0,W),
-    y:rand(0,H),
+    y:rand(-H,H),
 
-    size:rand(0.8,2),
+    size:rand(0.8,2.4),
 
-    vy:rand(0.05,0.18),
+    speed:rand(0.08,0.22),
 
-    glow:rand(3,10),
+    glow:rand(4,12),
 
     pulse:rand(0,Math.PI*2)
 
@@ -163,7 +170,7 @@ for(let i=0;i<CONFIG.movingStars;i++){
 
 /*
 ========================================
-PARTÍCULAS
+PARTÍCULAS DO ROSTO
 ========================================
 */
 
@@ -182,11 +189,7 @@ class Particle{
     this.vx=rand(-1,1);
     this.vy=rand(-1,1);
 
-    /*
-    PEQUENAS
-    */
-
-    this.size=rand(0.6,1.4);
+    this.size=rand(0.7,1.8);
 
     this.alpha=0;
 
@@ -197,10 +200,6 @@ class Particle{
     const dx=this.tx-this.x;
     const dy=this.ty-this.y;
 
-    /*
-    FORMA MUITO RÁPIDO
-    */
-
     this.vx+=dx*CONFIG.spring;
     this.vy+=dy*CONFIG.spring;
 
@@ -210,11 +209,9 @@ class Particle{
     this.x+=this.vx;
     this.y+=this.vy;
 
-    this.alpha+=0.04;
+    if(this.alpha<1){
 
-    if(this.alpha>1){
-
-      this.alpha=1;
+      this.alpha+=0.025;
 
     }
 
@@ -232,14 +229,10 @@ class Particle{
       Math.PI*2
     );
 
-    /*
-    BRANCO MAIS SUAVE
-    */
-
     ctx.fillStyle=
-      `rgba(255,255,255,${this.alpha*0.9})`;
+    `rgba(255,255,255,${this.alpha})`;
 
-    ctx.shadowBlur=8;
+    ctx.shadowBlur=12;
     ctx.shadowColor="white";
 
     ctx.fill();
@@ -264,13 +257,13 @@ img.onload=()=>{
   const offCtx=off.getContext("2d");
 
   /*
-  MENOR
+  TAMANHO DO ROSTO
   */
 
   const scale=Math.min(
 
-    (W*0.38)/img.width,
-    (H*0.58)/img.height
+    (W*0.42)/img.width,
+    (H*0.70)/img.height
 
   );
 
@@ -300,57 +293,59 @@ img.onload=()=>{
 
   let created=0;
 
-  /*
-  POUCOS PONTOS
-  */
-
   for(let y=0;y<off.height;y+=CONFIG.pixelStep){
 
     for(let x=0;x<off.width;x+=CONFIG.pixelStep){
 
       const i=
-        (y*off.width+x)*4;
+      (y*off.width+x)*4;
 
       const r=data[i];
       const g=data[i+1];
       const b=data[i+2];
 
-      /*
-      DETECÇÃO MELHOR
-      */
-
       const brightness=
-        (r+g+b)/3;
+      (r+g+b)/3;
 
       /*
-      PEGAR SÓ PARTES IMPORTANTES
+      FILTRO MELHOR
       */
 
-      if(brightness>55){
+      if(
+
+        brightness>80 &&
+
+        (
+          Math.abs(r-g)>8 ||
+          Math.abs(r-b)>8 ||
+          Math.abs(g-b)>8
+        )
+
+      ){
 
         const tx=x+offsetX;
         const ty=y+offsetY;
 
         /*
-        COMEÇAR DO CÉU
+        NASCEM DO CÉU
         */
 
         const startX=
-          tx+rand(-CONFIG.spawnRadius,CONFIG.spawnRadius);
+        tx+rand(
+          -CONFIG.spawnRadius,
+           CONFIG.spawnRadius
+        );
 
         const startY=
-          -rand(20,H);
+        -rand(50,H);
 
         particles.push(
 
           new Particle(
-
             startX,
             startY,
-
             tx,
             ty
-
           )
 
         );
@@ -379,7 +374,7 @@ img.onload=()=>{
 
 /*
 ========================================
-ESTRELAS FUNDO
+FUNDO
 ========================================
 */
 
@@ -398,7 +393,7 @@ function drawBackgroundStars(){
     );
 
     ctx.fillStyle=
-      `rgba(255,255,255,${s.alpha})`;
+    `rgba(255,255,255,${s.alpha})`;
 
     ctx.fill();
 
@@ -416,20 +411,20 @@ function drawMovingStars(time){
 
   for(let s of movingStars){
 
-    s.y+=s.vy;
+    s.y+=s.speed;
 
-    if(s.y>H){
+    if(s.y>H+10){
 
-      s.y=-10;
+      s.y=-20;
       s.x=rand(0,W);
 
     }
 
     const pulse=
-      0.7+
-      Math.sin(
-        time*0.002+s.pulse
-      )*0.3;
+    0.7+
+    Math.sin(
+      time*0.002+s.pulse
+    )*0.3;
 
     ctx.beginPath();
 
@@ -442,7 +437,7 @@ function drawMovingStars(time){
     );
 
     ctx.fillStyle=
-      `rgba(255,255,255,${pulse})`;
+    `rgba(255,255,255,${pulse})`;
 
     ctx.shadowBlur=s.glow;
     ctx.shadowColor="white";
@@ -455,7 +450,7 @@ function drawMovingStars(time){
 
 /*
 ========================================
-CONEXÕES
+LINHAS
 ========================================
 */
 
@@ -465,11 +460,11 @@ function connectParticles(){
 
     const a=particles[i];
 
-    /*
-    SUPER OTIMIZADO
-    */
-
-    for(let j=i+1;j<i+4 && j<particles.length;j++){
+    for(
+      let j=i+1;
+      j<i+5 && j<particles.length;
+      j++
+    ){
 
       const b=particles[j];
 
@@ -477,7 +472,7 @@ function connectParticles(){
       const dy=a.y-b.y;
 
       const dist=
-        Math.sqrt(dx*dx+dy*dy);
+      Math.sqrt(dx*dx+dy*dy);
 
       if(dist<CONFIG.connectDistance){
 
@@ -488,9 +483,9 @@ function connectParticles(){
         ctx.lineTo(b.x,b.y);
 
         ctx.strokeStyle=
-          "rgba(255,255,255,0.05)";
+        "rgba(255,255,255,0.06)";
 
-        ctx.lineWidth=0.3;
+        ctx.lineWidth=0.4;
 
         ctx.stroke();
 
@@ -513,18 +508,14 @@ function animate(time=0){
   requestAnimationFrame(animate);
 
   /*
-  SEM BORRÃO BRANCO
+  REMOVE O FILTRO CINZA
   */
 
-  ctx.fillStyle=
-    "rgba(0,0,0,0.35)";
+  ctx.clearRect(0,0,W,H);
 
-  ctx.fillRect(
-    0,
-    0,
-    W,
-    H
-  );
+  /*
+  FUNDO
+  */
 
   drawBackgroundStars();
 
@@ -540,6 +531,10 @@ function animate(time=0){
     p.draw();
 
   }
+
+  /*
+  CONSTELAÇÕES
+  */
 
   connectParticles();
 
